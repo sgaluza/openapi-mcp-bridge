@@ -1,0 +1,41 @@
+{
+  "name": "openapi-mcp-bridge",
+  "version": "0.1.0",
+  "description": "Generic OpenAPI → MCP stdio bridge. Turn any API with OpenAPI spec into an MCP server.",
+  "type": "module",
+  "bin": {
+    "openapi-mcp-bridge": "./dist/index.js"
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsup",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "prepublishOnly": "npm run build"
+  },
+  "keywords": [
+    "mcp",
+    "openapi",
+    "model-context-protocol",
+    "bridge",
+    "api",
+    "claude",
+    "cursor"
+  ],
+  "license": "MIT",
+  "engines": {
+    "node": ">=18"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.12.1",
+    "yaml": "^2.7.1"
+  },
+  "devDependencies": {
+    "@types/node": "^22.15.2",
+    "tsup": "^8.4.0",
+    "typescript": "^5.8.3",
+    "vitest": "^3.1.1"
+  }
+}

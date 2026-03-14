@@ -1,0 +1,64 @@
+# openapi-mcp-bridge
+
+Generic OpenAPI → MCP stdio bridge. Turn any API with an OpenAPI 3.x spec into an MCP (Model Context Protocol) server.
+
+## Usage
+
+```bash
+# By URL
+npx openapi-mcp-bridge https://api.example.com/openapi.yaml
+
+# Local file
+npx openapi-mcp-bridge ./openapi.yaml
+
+# With auth header
+npx openapi-mcp-bridge https://api.example.com/openapi.yaml --header "X-API-Key: pk_xxx"
+
+# Multiple headers
+npx openapi-mcp-bridge https://api.example.com/openapi.yaml \
+  --header "X-API-Key: pk_xxx" \
+  --header "X-Custom: value"
+
+# Auth via env (auto-detects from securitySchemes in spec)
+OPENAPI_API_KEY=pk_xxx npx openapi-mcp-bridge https://api.example.com/openapi.yaml
+OPENAPI_BEARER_TOKEN=token123 npx openapi-mcp-bridge https://api.example.com/openapi.yaml
+```
+
+## Configuration for Claude Code / MetaMCP
+
+```json
+{
+  "mcpServers": {
+    "my-api": {
+      "command": "npx",
+      "args": ["-y", "openapi-mcp-bridge", "https://api.example.com/openapi.yaml"],
+      "env": {
+        "OPENAPI_API_KEY": "pk_xxx"
+      }
+    }
+  }
+}
+```
+
+## How it works
+
+Each OpenAPI endpoint becomes an MCP tool:
+
+| OpenAPI | MCP Tool |
+|---------|----------|
+| `operationId` | Tool name (fallback: `{method}_{path}`) |
+| `summary` + `description` | Tool description |
+| Path params `{id}` | Required parameters |
+| Query params `?page=1` | Optional parameters |
+| `requestBody` | `body` parameter (object) |
+| `servers[0].url` + path | HTTP request target |
+
+## Auth resolution
+
+1. `--header` flags — added to every request (highest priority)
+2. `OPENAPI_BEARER_TOKEN` env — `Authorization: Bearer {token}`
+3. `OPENAPI_API_KEY` env — uses `securitySchemes` from spec to determine header name
+
+## License
+
+MIT
