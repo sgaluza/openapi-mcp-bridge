@@ -18,26 +18,33 @@ function parseArgs(argv: string[]): {
   headers: string[];
 } {
   const args = argv.slice(2);
-  if (args.length === 0 || args[0] === "--help" || args[0] === "-h") {
+  if (args[0] === "--help" || args[0] === "-h") {
     console.error(
-      `Usage: openapi-mcp-bridge <openapi-spec-url-or-path> [--header "Name: Value"]...
+      `Usage: @sgaluza/openapi-mcp-bridge <openapi-spec-url-or-path> [--header "Name: Value"]...
 
 Options:
   --header, -H    Add a custom header to all API requests (repeatable)
 
 Environment variables:
+  OPENAPI_SPEC_URL      OpenAPI spec URL or path (alternative to positional arg)
   OPENAPI_API_KEY       API key (uses securitySchemes from spec to determine header)
   OPENAPI_BEARER_TOKEN  Bearer token (adds Authorization: Bearer header)
 
 Examples:
-  openapi-mcp-bridge https://api.example.com/openapi.yaml
-  openapi-mcp-bridge ./openapi.yaml --header "X-API-Key: pk_xxx"
-  OPENAPI_API_KEY=pk_xxx openapi-mcp-bridge https://api.example.com/openapi.yaml`
+  npx @sgaluza/openapi-mcp-bridge https://api.example.com/openapi.yaml
+  npx @sgaluza/openapi-mcp-bridge ./openapi.yaml --header "X-API-Key: pk_xxx"
+  OPENAPI_SPEC_URL=https://api.example.com/openapi.yaml npx @sgaluza/openapi-mcp-bridge`
     );
-    process.exit(args.length === 0 ? 1 : 0);
+    process.exit(0);
   }
 
-  const specSource = args[0];
+  const specSource = args[0] || process.env.OPENAPI_SPEC_URL;
+  if (!specSource) {
+    console.error(
+      "Error: No spec source provided. Pass as argument or set OPENAPI_SPEC_URL env var."
+    );
+    process.exit(1);
+  }
   const headers: string[] = [];
 
   let i = 1;

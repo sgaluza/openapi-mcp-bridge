@@ -6,22 +6,22 @@ Generic OpenAPI → MCP stdio bridge. Turn any API with an OpenAPI 3.x spec into
 
 ```bash
 # By URL
-npx openapi-mcp-bridge https://api.example.com/openapi.yaml
+npx @sgaluza/openapi-mcp-bridge https://api.example.com/openapi.yaml
 
 # Local file
-npx openapi-mcp-bridge ./openapi.yaml
+npx @sgaluza/openapi-mcp-bridge ./openapi.yaml
 
 # With auth header
-npx openapi-mcp-bridge https://api.example.com/openapi.yaml --header "X-API-Key: pk_xxx"
+npx @sgaluza/openapi-mcp-bridge https://api.example.com/openapi.yaml --header "X-API-Key: pk_xxx"
 
 # Multiple headers
-npx openapi-mcp-bridge https://api.example.com/openapi.yaml \
+npx @sgaluza/openapi-mcp-bridge https://api.example.com/openapi.yaml \
   --header "X-API-Key: pk_xxx" \
   --header "X-Custom: value"
 
 # Auth via env (auto-detects from securitySchemes in spec)
-OPENAPI_API_KEY=pk_xxx npx openapi-mcp-bridge https://api.example.com/openapi.yaml
-OPENAPI_BEARER_TOKEN=token123 npx openapi-mcp-bridge https://api.example.com/openapi.yaml
+OPENAPI_API_KEY=pk_xxx npx @sgaluza/openapi-mcp-bridge https://api.example.com/openapi.yaml
+OPENAPI_BEARER_TOKEN=token123 npx @sgaluza/openapi-mcp-bridge https://api.example.com/openapi.yaml
 ```
 
 ## Configuration for Claude Code / MetaMCP
@@ -31,7 +31,7 @@ OPENAPI_BEARER_TOKEN=token123 npx openapi-mcp-bridge https://api.example.com/ope
   "mcpServers": {
     "my-api": {
       "command": "npx",
-      "args": ["-y", "openapi-mcp-bridge", "https://api.example.com/openapi.yaml"],
+      "args": ["-y", "@sgaluza/openapi-mcp-bridge", "https://api.example.com/openapi.yaml"],
       "env": {
         "OPENAPI_API_KEY": "pk_xxx"
       }
