@@ -1,6 +1,6 @@
 {
-  "name": "openapi-mcp-bridge",
-  "version": "0.1.0",
+  "name": "@sgaluza/openapi-mcp-bridge",
+  "version": "0.1.1",
   "description": "Generic OpenAPI → MCP stdio bridge. Turn any API with OpenAPI spec into an MCP server.",
   "type": "module",
   "bin": {
@@ -24,6 +24,14 @@
     "claude",
     "cursor"
   ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/sgaluza/openapi-mcp-bridge.git"
+  },
+  "homepage": "https://github.com/sgaluza/openapi-mcp-bridge#readme",
+  "bugs": {
+    "url": "https://github.com/sgaluza/openapi-mcp-bridge/issues"
+  },
   "license": "MIT",
   "engines": {
     "node": ">=18"
