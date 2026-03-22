@@ -1,27 +1,27 @@
-# openapi-mcp-bridge
+# api-to-mcp
 
-Generic OpenAPI → MCP stdio bridge. Turn any API with an OpenAPI 3.x spec into an MCP (Model Context Protocol) server.
+Turn any API (OpenAPI or GraphQL) into an MCP server via stdio bridge.
 
 ## Usage
 
 ```bash
 # By URL
-npx @sgaluza/openapi-mcp-bridge https://api.example.com/openapi.yaml
+npx @sgaluza/api-to-mcp https://api.example.com/openapi.yaml
 
 # Local file
-npx @sgaluza/openapi-mcp-bridge ./openapi.yaml
+npx @sgaluza/api-to-mcp ./openapi.yaml
 
 # With auth header
-npx @sgaluza/openapi-mcp-bridge https://api.example.com/openapi.yaml --header "X-API-Key: pk_xxx"
+npx @sgaluza/api-to-mcp https://api.example.com/openapi.yaml --header "X-API-Key: pk_xxx"
 
 # Multiple headers
-npx @sgaluza/openapi-mcp-bridge https://api.example.com/openapi.yaml \
+npx @sgaluza/api-to-mcp https://api.example.com/openapi.yaml \
   --header "X-API-Key: pk_xxx" \
   --header "X-Custom: value"
 
 # Auth via env (auto-detects from securitySchemes in spec)
-OPENAPI_API_KEY=pk_xxx npx @sgaluza/openapi-mcp-bridge https://api.example.com/openapi.yaml
-OPENAPI_BEARER_TOKEN=token123 npx @sgaluza/openapi-mcp-bridge https://api.example.com/openapi.yaml
+OPENAPI_API_KEY=pk_xxx npx @sgaluza/api-to-mcp https://api.example.com/openapi.yaml
+OPENAPI_BEARER_TOKEN=token123 npx @sgaluza/api-to-mcp https://api.example.com/openapi.yaml
 ```
 
 ## Configuration for Claude Code / MetaMCP
@@ -31,7 +31,7 @@ OPENAPI_BEARER_TOKEN=token123 npx @sgaluza/openapi-mcp-bridge https://api.exampl
   "mcpServers": {
     "my-api": {
       "command": "npx",
-      "args": ["-y", "@sgaluza/openapi-mcp-bridge", "https://api.example.com/openapi.yaml"],
+      "args": ["-y", "@sgaluza/api-to-mcp", "https://api.example.com/openapi.yaml"],
       "env": {
         "OPENAPI_API_KEY": "pk_xxx"
       }
