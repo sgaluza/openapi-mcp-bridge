@@ -596,9 +596,41 @@ describe("resolveFilterOptions", () => {
     resolveFilterOptions({ only: "foo", exclude: "bar" }, []);
 
     expect(exitSpy).toHaveBeenCalledWith(1);
+    expect(stderrSpy).toHaveBeenCalledWith(expect.stringContaining("mutually exclusive"));
 
     exitSpy.mockRestore();
     stderrSpy.mockRestore();
+  });
+
+  it("warns on unknown operations in --only", () => {
+    const stderrSpy = vi.spyOn(process.stderr, "write").mockImplementation(() => true);
+    const tools = buildTools(testSpec);
+
+    resolveFilterOptions({ only: "nonExistent,alsoUnknown" }, tools);
+
+    expect(stderrSpy).toHaveBeenCalledWith(expect.stringContaining("unknown operations in --only"));
+    expect(stderrSpy).toHaveBeenCalledWith(expect.stringContaining("Hint:"));
+
+    stderrSpy.mockRestore();
+  });
+
+  it("warns on unknown operations in --exclude", () => {
+    const stderrSpy = vi.spyOn(process.stderr, "write").mockImplementation(() => true);
+    const tools = buildTools(testSpec);
+
+    resolveFilterOptions({ exclude: "nonExistent" }, tools);
+
+    expect(stderrSpy).toHaveBeenCalledWith(expect.stringContaining("unknown operations in --exclude"));
+
+    stderrSpy.mockRestore();
+  });
+
+  it("returns parsed only/exclude arrays without side effects for valid inputs", () => {
+    const tools = buildTools(testSpec);
+    const result = resolveFilterOptions({ only: "listUsers, getUser" }, tools);
+
+    expect(result.only).toEqual(["listUsers", "getUser"]);
+    expect(result.exclude).toBeUndefined();
   });
 });
 
