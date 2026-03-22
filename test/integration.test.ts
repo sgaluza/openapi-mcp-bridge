@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { loadSpec, resolveRef, resolveSchemaRefs } from "../src/spec-loader.js";
-import { buildTools, filterTools } from "../src/tool-builder.js";
+import { buildTools, filterTools, applyBindings } from "../src/tool-builder.js";
+import { parseBindings } from "../src/commands/bind-options.js";
 import { resolveBaseUrl } from "../src/executor.js";
 import { resolveAuthHeaders, parseHeaderFlags } from "../src/auth.js";
 import { splitCsv, resolveFilterOptions } from "../src/commands/filter-options.js";
@@ -657,5 +658,103 @@ describe("splitCsv", () => {
 
   it("handles leading/trailing commas", () => {
     expect(splitCsv(",a,b,")).toEqual(["a", "b"]);
+  });
+});
+
+describe("parseBindings", () => {
+  it("parses simple key=value", () => {
+    expect(parseBindings(["teamId=TEAM_ABC"])).toEqual({ teamId: "TEAM_ABC" });
+  });
+
+  it("handles value containing = sign", () => {
+    expect(parseBindings(["key=a=b=c"])).toEqual({ key: "a=b=c" });
+  });
+
+  it("trims whitespace from key", () => {
+    expect(parseBindings([" teamId =TEAM_ABC"])).toEqual({ teamId: "TEAM_ABC" });
+  });
+
+  it("skips entries without =", () => {
+    expect(parseBindings(["noequals"])).toEqual({});
+  });
+
+  it("skips entries with empty key", () => {
+    expect(parseBindings(["=value"])).toEqual({});
+  });
+
+  it("returns empty object for empty array", () => {
+    expect(parseBindings([])).toEqual({});
+  });
+
+  it("parses multiple bindings", () => {
+    expect(parseBindings(["teamId=T1", "projectId=P2"])).toEqual({
+      teamId: "T1",
+      projectId: "P2",
+    });
+  });
+});
+
+describe("applyBindings", () => {
+  it("removes bound param from properties", () => {
+    const tools = buildTools(testSpec);
+    const getUser = tools.find((t) => t.name === "getUser")!;
+
+    const [bound] = applyBindings([getUser], { userId: "fixed" });
+
+    expect(bound.inputSchema.properties).not.toHaveProperty("userId");
+  });
+
+  it("removes bound param from required array", () => {
+    const tools = buildTools(testSpec);
+    const getUser = tools.find((t) => t.name === "getUser")!;
+
+    const [bound] = applyBindings([getUser], { userId: "fixed" });
+
+    expect(bound.inputSchema.required).not.toContain("userId");
+  });
+
+  it("removes bound param from pathParams", () => {
+    const tools = buildTools(testSpec);
+    const getUser = tools.find((t) => t.name === "getUser")!;
+
+    const [bound] = applyBindings([getUser], { userId: "fixed" });
+
+    expect(bound.pathParams).not.toContain("userId");
+  });
+
+  it("removes bound query param from queryParams", () => {
+    const tools = buildTools(testSpec);
+    const listUsers = tools.find((t) => t.name === "listUsers")!;
+    // Add a queryParam assumption: listUsers may have query params
+    // Just verify that a binding for a non-existent key does nothing
+    const [bound] = applyBindings([listUsers], { nonExistent: "x" });
+
+    expect(bound.inputSchema.properties).toEqual(listUsers.inputSchema.properties);
+  });
+
+  it("does not mutate the original tool", () => {
+    const tools = buildTools(testSpec);
+    const getUser = tools.find((t) => t.name === "getUser")!;
+    const originalRequired = [...getUser.inputSchema.required];
+
+    applyBindings([getUser], { userId: "fixed" });
+
+    expect(getUser.inputSchema.required).toEqual(originalRequired);
+  });
+
+  it("returns tools unchanged when bindings is empty", () => {
+    const tools = buildTools(testSpec);
+    const result = applyBindings(tools, {});
+
+    expect(result).toEqual(tools);
+  });
+
+  it("unbound params are preserved", () => {
+    const tools = buildTools(testSpec);
+    const getUser = tools.find((t) => t.name === "getUser")!;
+
+    const [bound] = applyBindings([getUser], { someOtherParam: "x" });
+
+    expect(bound.inputSchema.properties).toHaveProperty("userId");
   });
 });

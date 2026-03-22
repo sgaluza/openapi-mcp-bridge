@@ -98,6 +98,37 @@ export interface FilterToolsOptions {
 const READONLY_METHODS = new Set(["GET", "HEAD"]);
 
 /**
+ * Remove pre-bound parameters from tool input schemas.
+ * Bound params are hidden from the MCP client — the bridge injects their
+ * values automatically at call time via the bindings map.
+ * Applies to path params, query params, and top-level properties.
+ */
+export function applyBindings(
+  tools: ToolDefinition[],
+  bindings: Record<string, string>
+): ToolDefinition[] {
+  if (Object.keys(bindings).length === 0) return tools;
+
+  return tools.map((tool) => {
+    const properties = { ...tool.inputSchema.properties };
+    for (const key of Object.keys(bindings)) {
+      delete properties[key];
+    }
+
+    return {
+      ...tool,
+      inputSchema: {
+        ...tool.inputSchema,
+        properties,
+        required: tool.inputSchema.required.filter((r) => !(r in bindings)),
+      },
+      pathParams: tool.pathParams.filter((p) => !(p in bindings)),
+      queryParams: tool.queryParams.filter((p) => !(p in bindings)),
+    };
+  });
+}
+
+/**
  * Filter tool definitions based on provided options.
  * Filters are applied in order: readonly → only → exclude.
  * Empty only/exclude arrays are treated as "no filter".
