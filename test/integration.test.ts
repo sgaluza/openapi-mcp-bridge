@@ -3,7 +3,7 @@ import { loadSpec, resolveRef, resolveSchemaRefs } from "../src/spec-loader.js";
 import { buildTools, filterTools } from "../src/tool-builder.js";
 import { resolveBaseUrl } from "../src/executor.js";
 import { resolveAuthHeaders, parseHeaderFlags } from "../src/auth.js";
-import { splitCsv } from "../src/commands/filter-options.js";
+import { splitCsv, resolveFilterOptions } from "../src/commands/filter-options.js";
 import type { OpenAPISpec } from "../src/spec-loader.js";
 
 /** Minimal OpenAPI 3.0 spec fixture for testing */
@@ -585,6 +585,20 @@ describe("executor - HTTP request building", () => {
 
     expect(result.isError).toBe(true);
     expect(result.content).toContain("Connection refused");
+  });
+});
+
+describe("resolveFilterOptions", () => {
+  it("exits with code 1 when both --only and --exclude are provided", () => {
+    const exitSpy = vi.spyOn(process, "exit").mockImplementation((() => {}) as never);
+    const stderrSpy = vi.spyOn(process.stderr, "write").mockImplementation(() => true);
+
+    resolveFilterOptions({ only: "foo", exclude: "bar" }, []);
+
+    expect(exitSpy).toHaveBeenCalledWith(1);
+
+    exitSpy.mockRestore();
+    stderrSpy.mockRestore();
   });
 });
 
