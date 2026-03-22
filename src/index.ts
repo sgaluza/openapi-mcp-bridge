@@ -51,7 +51,7 @@ Examples:
   return {
     specSource,
     headers: opts.header,
-    readonly: opts.readonly ?? false,
+    readonly: !!opts.readonly,
   };
 }
 

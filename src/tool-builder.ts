@@ -87,15 +87,14 @@ function resolveRequestBody(
 }
 
 export interface FilterToolsOptions {
-  /** When true, only include read-only operations (GET for OpenAPI) */
+  /** When true, only include read-only operations (GET and HEAD for OpenAPI) */
   readonly?: boolean;
 }
-
-const READONLY_METHODS = new Set(["GET", "HEAD"]);
 
 /**
  * Filter tool definitions based on provided options.
  */
+const READONLY_METHODS = new Set(["GET", "HEAD"]);
 export function filterTools(
   tools: ToolDefinition[],
   options: FilterToolsOptions

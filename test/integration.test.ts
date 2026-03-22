@@ -110,6 +110,9 @@ const testSpec: OpenAPISpec = {
       get: {
         summary: "Health check",
       },
+      head: {
+        summary: "Health check (HEAD)",
+      },
     },
   },
   components: {
@@ -136,7 +139,7 @@ describe("tool-builder", () => {
   it("creates correct tool definitions from OpenAPI spec", () => {
     const tools = buildTools(testSpec);
 
-    expect(tools.length).toBe(6);
+    expect(tools.length).toBe(7);
 
     // Check listUsers tool
     const listUsers = tools.find((t) => t.name === "listUsers");
@@ -228,9 +231,9 @@ describe("filterTools --readonly", () => {
     const tools = buildTools(testSpec);
     const readonly = filterTools(tools, { readonly: true });
 
-    expect(readonly.every((t) => t.method === "GET")).toBe(true);
+    expect(readonly.every((t) => t.method === "GET" || t.method === "HEAD")).toBe(true);
     expect(readonly.map((t) => t.name)).toEqual(
-      expect.arrayContaining(["listUsers", "getUser", "get_health"])
+      expect.arrayContaining(["listUsers", "getUser", "get_health", "head_health"])
     );
     expect(readonly.find((t) => t.name === "createUser")).toBeUndefined();
     expect(readonly.find((t) => t.name === "put_users_userId")).toBeUndefined();
