@@ -23,14 +23,14 @@ export function resolveFilterOptions(
   if (only) {
     const unknown = only.filter((name) => !toolNames.has(name));
     if (unknown.length > 0) {
-      process.stderr.write(chalk.yellow(`Warning: unknown operations in --only: ${unknown.join(", ")}\n`));
+      process.stderr.write(chalk.yellow(`Warning: unknown operations in --only: ${unknown.join(", ")}\nHint: run without --only/--exclude to see all available operations\n`));
     }
   }
 
   if (exclude) {
     const unknown = exclude.filter((name) => !toolNames.has(name));
     if (unknown.length > 0) {
-      process.stderr.write(chalk.yellow(`Warning: unknown operations in --exclude: ${unknown.join(", ")}\n`));
+      process.stderr.write(chalk.yellow(`Warning: unknown operations in --exclude: ${unknown.join(", ")}\nHint: run without --only/--exclude to see all available operations\n`));
     }
   }
 
