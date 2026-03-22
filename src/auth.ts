@@ -13,8 +13,10 @@ export interface AuthConfig {
  *
  * Priority:
  * 1. Explicit --header flags (highest priority)
- * 2. OPENAPI_BEARER_TOKEN env → Authorization: Bearer {token}
- * 3. OPENAPI_API_KEY env → uses securitySchemes to determine header name and location
+ * 2. API2MCP_BEARER_TOKEN env → Authorization: Bearer {token}
+ * 3. API2MCP_API_KEY env → uses securitySchemes to determine header name and location
+ *
+ * Legacy OPENAPI_* variables are supported as aliases for backwards compatibility.
  */
 export function resolveAuthHeaders(
   spec: OpenAPISpec,
@@ -22,14 +24,14 @@ export function resolveAuthHeaders(
 ): Record<string, string> {
   const headers: Record<string, string> = {};
 
-  // 1. OPENAPI_BEARER_TOKEN from env
-  const bearerToken = config.env.OPENAPI_BEARER_TOKEN;
+  // 1. API2MCP_BEARER_TOKEN from env (OPENAPI_BEARER_TOKEN as legacy alias)
+  const bearerToken = config.env.API2MCP_BEARER_TOKEN ?? config.env.OPENAPI_BEARER_TOKEN;
   if (bearerToken) {
     headers["Authorization"] = `Bearer ${bearerToken}`;
   }
 
-  // 2. OPENAPI_API_KEY from env — find matching securityScheme
-  const apiKey = config.env.OPENAPI_API_KEY;
+  // 2. API2MCP_API_KEY from env — find matching securityScheme (OPENAPI_API_KEY as legacy alias)
+  const apiKey = config.env.API2MCP_API_KEY ?? config.env.OPENAPI_API_KEY;
   if (apiKey && spec.components?.securitySchemes) {
     const scheme = findApiKeyScheme(spec.components.securitySchemes);
     if (scheme && scheme.in === "header" && scheme.name) {

@@ -26,22 +26,24 @@ Options:
   --header, -H    Add a custom header to all API requests (repeatable)
 
 Environment variables:
-  OPENAPI_SPEC_URL      OpenAPI spec URL or path (alternative to positional arg)
-  OPENAPI_API_KEY       API key (uses securitySchemes from spec to determine header)
-  OPENAPI_BEARER_TOKEN  Bearer token (adds Authorization: Bearer header)
+  API2MCP_SPEC_URL      API spec URL or path (alternative to positional arg)
+  API2MCP_API_KEY       API key (uses securitySchemes from spec to determine header)
+  API2MCP_BEARER_TOKEN  Bearer token (adds Authorization: Bearer header)
+
+  Legacy aliases (still supported): OPENAPI_SPEC_URL, OPENAPI_API_KEY, OPENAPI_BEARER_TOKEN
 
 Examples:
   npx @sgaluza/api-to-mcp https://api.example.com/openapi.yaml
   npx @sgaluza/api-to-mcp ./openapi.yaml --header "X-API-Key: pk_xxx"
-  OPENAPI_SPEC_URL=https://api.example.com/openapi.yaml npx @sgaluza/api-to-mcp`
+  API2MCP_SPEC_URL=https://api.example.com/openapi.yaml npx @sgaluza/api-to-mcp`
     );
     process.exit(0);
   }
 
-  const specSource = args[0] || process.env.OPENAPI_SPEC_URL;
+  const specSource = args[0] || process.env.API2MCP_SPEC_URL || process.env.OPENAPI_SPEC_URL;
   if (!specSource) {
     console.error(
-      "Error: No spec source provided. Pass as argument or set OPENAPI_SPEC_URL env var."
+      "Error: No spec source provided. Pass as argument or set API2MCP_SPEC_URL env var."
     );
     process.exit(1);
   }

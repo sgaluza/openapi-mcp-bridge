@@ -20,8 +20,8 @@ npx @sgaluza/api-to-mcp https://api.example.com/openapi.yaml \
   --header "X-Custom: value"
 
 # Auth via env (auto-detects from securitySchemes in spec)
-OPENAPI_API_KEY=pk_xxx npx @sgaluza/api-to-mcp https://api.example.com/openapi.yaml
-OPENAPI_BEARER_TOKEN=token123 npx @sgaluza/api-to-mcp https://api.example.com/openapi.yaml
+API2MCP_API_KEY=pk_xxx npx @sgaluza/api-to-mcp https://api.example.com/openapi.yaml
+API2MCP_BEARER_TOKEN=token123 npx @sgaluza/api-to-mcp https://api.example.com/openapi.yaml
 ```
 
 ## Configuration for Claude Code / MetaMCP
@@ -33,7 +33,7 @@ OPENAPI_BEARER_TOKEN=token123 npx @sgaluza/api-to-mcp https://api.example.com/op
       "command": "npx",
       "args": ["-y", "@sgaluza/api-to-mcp", "https://api.example.com/openapi.yaml"],
       "env": {
-        "OPENAPI_API_KEY": "pk_xxx"
+        "API2MCP_API_KEY": "pk_xxx"
       }
     }
   }
@@ -56,8 +56,10 @@ Each OpenAPI endpoint becomes an MCP tool:
 ## Auth resolution
 
 1. `--header` flags — added to every request (highest priority)
-2. `OPENAPI_BEARER_TOKEN` env — `Authorization: Bearer {token}`
-3. `OPENAPI_API_KEY` env — uses `securitySchemes` from spec to determine header name
+2. `API2MCP_BEARER_TOKEN` env — `Authorization: Bearer {token}`
+3. `API2MCP_API_KEY` env — uses `securitySchemes` from spec to determine header name
+
+Legacy `OPENAPI_BEARER_TOKEN` / `OPENAPI_API_KEY` / `OPENAPI_SPEC_URL` are still supported as aliases.
 
 ## License
 
