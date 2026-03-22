@@ -20,7 +20,7 @@ function parseArgs(argv: string[]): {
   const args = argv.slice(2);
   if (args[0] === "--help" || args[0] === "-h") {
     console.error(
-      `Usage: @sgaluza/api-to-mcp <openapi-spec-url-or-path> [--header "Name: Value"]...
+      `Usage: @sgaluza/api-to-mcp <api-spec-url-or-path> [--header "Name: Value"]...
 
 Options:
   --header, -H    Add a custom header to all API requests (repeatable)

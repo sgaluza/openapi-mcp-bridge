@@ -1,6 +1,6 @@
 # api-to-mcp
 
-Turn any API (OpenAPI or GraphQL) into an MCP server via stdio bridge.
+Turn any API (OpenAPI, GraphQL coming soon) into an MCP server via stdio bridge.
 
 ## Usage
 
