@@ -69,7 +69,7 @@ Examples:
 async function main() {
   const { specSource, headers } = parseArgs(process.argv);
 
-  // Load and parse the OpenAPI spec
+  // Load and parse the API spec
   const spec = await loadSpec(specSource);
   const serverName = spec.info.title || "api-to-mcp";
   const serverVersion = spec.info.version || "0.1.0";
