@@ -20,6 +20,6 @@ https://github.com/sgaluza/api-to-mcp/issues/1`)
         chalk.yellow("⚠ GraphQL support is coming soon.\n") +
         `  Track progress: ${chalk.dim("https://github.com/sgaluza/api-to-mcp/issues/1")}\n`
       );
-      process.exit(0);
+      process.exit(1);
     });
 }

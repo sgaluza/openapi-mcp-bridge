@@ -39,7 +39,7 @@ Examples:
         process.exit(1);
       }
 
-      const readonly = !!opts.readonly;
+      const readonly = opts.readonly ?? false;
 
       const spec = await loadSpec(specSource);
       const serverName = spec.info.title || "api-to-mcp";

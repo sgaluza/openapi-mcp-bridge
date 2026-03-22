@@ -26,10 +26,7 @@ export interface McpServerOptions {
 export async function startMcpServer(opts: McpServerOptions): Promise<void> {
   const { serverName, serverVersion, tools, specSource, baseUrl, readonly, executeCall } = opts;
 
-  const toolMap = new Map<string, ToolDefinition>();
-  for (const tool of tools) {
-    toolMap.set(tool.name, tool);
-  }
+  const toolMap = new Map(tools.map((tool) => [tool.name, tool]));
 
   const server = new Server(
     { name: serverName, version: serverVersion },
@@ -55,7 +52,15 @@ export async function startMcpServer(opts: McpServerOptions): Promise<void> {
       };
     }
 
-    const result = await executeCall(tool, (args ?? {}) as Record<string, unknown>);
+    let result: { content: string; isError: boolean };
+    try {
+      result = await executeCall(tool, (args ?? {}) as Record<string, unknown>);
+    } catch (error) {
+      result = {
+        content: `Internal error: ${error instanceof Error ? error.message : String(error)}`,
+        isError: true,
+      };
+    }
     return {
       content: [{ type: "text" as const, text: result.content }],
       isError: result.isError,
