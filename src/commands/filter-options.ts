@@ -5,7 +5,6 @@ import type { ToolDefinition } from "../tool-builder.js";
  * Parse and validate --only / --exclude CLI options.
  * Exits with an error if both are provided simultaneously.
  * Warns on unknown operation names.
- * Exits with an error if no tools remain after filtering.
  */
 export function resolveFilterOptions(
   opts: { only?: string; exclude?: string },
