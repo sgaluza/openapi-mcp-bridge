@@ -5,7 +5,7 @@ import {
   ListToolsRequestSchema,
 } from "@modelcontextprotocol/sdk/types.js";
 import { loadSpec } from "./spec-loader.js";
-import { buildTools, type ToolDefinition } from "./tool-builder.js";
+import { buildTools, filterTools, type ToolDefinition } from "./tool-builder.js";
 import { executeToolCall, resolveBaseUrl } from "./executor.js";
 import { resolveAuthHeaders, parseHeaderFlags } from "./auth.js";
 
@@ -16,14 +16,16 @@ import { resolveAuthHeaders, parseHeaderFlags } from "./auth.js";
 function parseArgs(argv: string[]): {
   specSource: string;
   headers: string[];
+  readonly: boolean;
 } {
   const args = argv.slice(2);
   if (args[0] === "--help" || args[0] === "-h") {
     console.error(
-      `Usage: @sgaluza/api-to-mcp <api-spec-url-or-path> [--header "Name: Value"]...
+      `Usage: @sgaluza/api-to-mcp <api-spec-url-or-path> [--header "Name: Value"]... [--readonly]
 
 Options:
   --header, -H    Add a custom header to all API requests (repeatable)
+  --readonly      Expose only read-only operations (GET/HEAD)
 
 Environment variables:
   API2MCP_SPEC_URL      API spec URL or path (alternative to positional arg)
@@ -35,6 +37,7 @@ Environment variables:
 Examples:
   npx @sgaluza/api-to-mcp https://api.example.com/openapi.yaml
   npx @sgaluza/api-to-mcp ./openapi.yaml --header "X-API-Key: pk_xxx"
+  npx @sgaluza/api-to-mcp https://api.example.com/openapi.yaml --readonly
   API2MCP_SPEC_URL=https://api.example.com/openapi.yaml npx @sgaluza/api-to-mcp`
     );
     process.exit(0);
@@ -48,6 +51,7 @@ Examples:
     process.exit(1);
   }
   const headers: string[] = [];
+  let readonly = false;
 
   let i = 1;
   while (i < args.length) {
@@ -58,6 +62,8 @@ Examples:
         process.exit(1);
       }
       headers.push(args[i]);
+    } else if (args[i] === "--readonly") {
+      readonly = true;
     } else {
       console.error(`Unknown argument: ${args[i]}`);
       process.exit(1);
@@ -65,19 +71,19 @@ Examples:
     i++;
   }
 
-  return { specSource, headers };
+  return { specSource, headers, readonly };
 }
 
 async function main() {
-  const { specSource, headers } = parseArgs(process.argv);
+  const { specSource, headers, readonly } = parseArgs(process.argv);
 
   // Load and parse the API spec
   const spec = await loadSpec(specSource);
   const serverName = spec.info.title || "api-to-mcp";
   const serverVersion = spec.info.version || "0.1.0";
 
-  // Build tool definitions from the spec
-  const tools = buildTools(spec);
+  // Build and filter tool definitions from the spec
+  const tools = filterTools(buildTools(spec), { readonly });
   const toolMap = new Map<string, ToolDefinition>();
   for (const tool of tools) {
     toolMap.set(tool.name, tool);

@@ -86,6 +86,26 @@ function resolveRequestBody(
   return body as OpenAPIRequestBody;
 }
 
+export interface FilterToolsOptions {
+  /** When true, only include read-only operations (GET for OpenAPI) */
+  readonly?: boolean;
+}
+
+const READONLY_METHODS = new Set(["GET", "HEAD"]);
+
+/**
+ * Filter tool definitions based on provided options.
+ */
+export function filterTools(
+  tools: ToolDefinition[],
+  options: FilterToolsOptions
+): ToolDefinition[] {
+  if (options.readonly) {
+    return tools.filter((t) => READONLY_METHODS.has(t.method));
+  }
+  return tools;
+}
+
 /**
  * Convert all OpenAPI operations into MCP tool definitions.
  */

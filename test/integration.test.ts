@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { loadSpec, resolveRef, resolveSchemaRefs } from "../src/spec-loader.js";
-import { buildTools } from "../src/tool-builder.js";
+import { buildTools, filterTools } from "../src/tool-builder.js";
 import { resolveBaseUrl } from "../src/executor.js";
 import { resolveAuthHeaders, parseHeaderFlags } from "../src/auth.js";
 import type { OpenAPISpec } from "../src/spec-loader.js";
@@ -220,6 +220,37 @@ describe("tool-builder", () => {
     expect(health!.hasBody).toBe(false);
     expect(health!.inputSchema.properties).toEqual({});
     expect(health!.inputSchema.required).toEqual([]);
+  });
+});
+
+describe("filterTools --readonly", () => {
+  it("returns only GET tools when readonly is true", () => {
+    const tools = buildTools(testSpec);
+    const readonly = filterTools(tools, { readonly: true });
+
+    expect(readonly.every((t) => t.method === "GET")).toBe(true);
+    expect(readonly.map((t) => t.name)).toEqual(
+      expect.arrayContaining(["listUsers", "getUser", "get_health"])
+    );
+    expect(readonly.find((t) => t.name === "createUser")).toBeUndefined();
+    expect(readonly.find((t) => t.name === "put_users_userId")).toBeUndefined();
+    expect(
+      readonly.find((t) => t.name === "delete_users_userId_posts_postId")
+    ).toBeUndefined();
+  });
+
+  it("returns all tools when readonly is false", () => {
+    const tools = buildTools(testSpec);
+    const all = filterTools(tools, { readonly: false });
+
+    expect(all.length).toBe(tools.length);
+  });
+
+  it("returns all tools when no options passed", () => {
+    const tools = buildTools(testSpec);
+    const all = filterTools(tools, {});
+
+    expect(all.length).toBe(tools.length);
   });
 });
 
