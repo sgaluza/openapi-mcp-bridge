@@ -3,6 +3,7 @@ import { loadSpec, resolveRef, resolveSchemaRefs } from "../src/spec-loader.js";
 import { buildTools, filterTools } from "../src/tool-builder.js";
 import { resolveBaseUrl } from "../src/executor.js";
 import { resolveAuthHeaders, parseHeaderFlags } from "../src/auth.js";
+import { splitCsv } from "../src/commands/filter-options.js";
 import type { OpenAPISpec } from "../src/spec-loader.js";
 
 /** Minimal OpenAPI 3.0 spec fixture for testing */
@@ -584,5 +585,31 @@ describe("executor - HTTP request building", () => {
 
     expect(result.isError).toBe(true);
     expect(result.content).toContain("Connection refused");
+  });
+});
+
+describe("splitCsv", () => {
+  it("splits comma-separated values", () => {
+    expect(splitCsv("a,b,c")).toEqual(["a", "b", "c"]);
+  });
+
+  it("trims whitespace around values", () => {
+    expect(splitCsv("a , b , c")).toEqual(["a", "b", "c"]);
+  });
+
+  it("filters out empty segments", () => {
+    expect(splitCsv("a,,b")).toEqual(["a", "b"]);
+  });
+
+  it("returns single value without comma", () => {
+    expect(splitCsv("onlyOne")).toEqual(["onlyOne"]);
+  });
+
+  it("returns empty array for blank string", () => {
+    expect(splitCsv("")).toEqual([]);
+  });
+
+  it("handles leading/trailing commas", () => {
+    expect(splitCsv(",a,b,")).toEqual(["a", "b"]);
   });
 });

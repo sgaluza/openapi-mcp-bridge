@@ -5,9 +5,9 @@ import { buildTools, filterTools } from "../tool-builder.js";
 import { executeToolCall, resolveBaseUrl } from "../executor.js";
 import { resolveAuthHeaders, parseHeaderFlags } from "../auth.js";
 import { startMcpServer } from "../mcp-server.js";
+import { resolveFilterOptions } from "./filter-options.js";
 
 const collect = (val: string, acc: string[]) => [...acc, val];
-const splitCsv = (val: string) => val.split(",").map((s) => s.trim()).filter(Boolean);
 
 /**
  * Register the `rest` subcommand onto the given commander program.
@@ -44,29 +44,15 @@ Examples:
         process.exit(1);
       }
 
-      if (opts.only && opts.exclude) {
-        process.stderr.write(chalk.red("Error: --only and --exclude are mutually exclusive.\n"));
-        process.exit(1);
-      }
-
       const readonly = opts.readonly ?? false;
-      const only = opts.only ? splitCsv(opts.only) : undefined;
-      const exclude = opts.exclude ? splitCsv(opts.exclude) : undefined;
 
       const spec = await loadSpec(specSource);
       const serverName = spec.info.title || "api-to-mcp";
       const serverVersion = spec.info.version || "0.1.0";
 
       const allTools = buildTools(spec);
+      const { only, exclude } = resolveFilterOptions(opts, allTools);
       const tools = filterTools(allTools, { readonly, only, exclude });
-
-      if (only) {
-        const toolNames = new Set(allTools.map((t) => t.name));
-        const unknown = only.filter((name) => !toolNames.has(name));
-        if (unknown.length > 0) {
-          process.stderr.write(chalk.yellow(`Warning: unknown operations in --only: ${unknown.join(", ")}\n`));
-        }
-      }
 
       if (tools.length === 0) {
         process.stderr.write(chalk.red("Error: no tools remaining after filtering. Check --only/--exclude/--readonly flags.\n"));
