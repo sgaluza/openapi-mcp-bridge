@@ -124,12 +124,8 @@ async function main() {
   // Log startup info to stderr (stdout is reserved for MCP protocol)
   const readonlyBadge = readonly ? chalk.yellow(" [readonly]") : "";
   process.stderr.write(
-    chalk.green("✓") + ` ${chalk.bold(serverName)} v${serverVersion}${readonlyBadge}\n`
-  );
-  process.stderr.write(
-    chalk.cyan("⚡") + ` ${tools.length} tools loaded from ${chalk.dim(specSource)}\n`
-  );
-  process.stderr.write(
+    chalk.green("✓") + ` ${chalk.bold(serverName)} v${serverVersion}${readonlyBadge}\n` +
+    chalk.cyan("⚡") + ` ${tools.length} tools loaded from ${chalk.dim(specSource)}\n` +
     chalk.cyan("🌐") + ` Base URL: ${chalk.dim(baseUrl)}\n`
   );
 }

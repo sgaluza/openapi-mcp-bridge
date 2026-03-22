@@ -91,10 +91,11 @@ export interface FilterToolsOptions {
   readonly?: boolean;
 }
 
+const READONLY_METHODS = new Set(["GET", "HEAD"]);
+
 /**
  * Filter tool definitions based on provided options.
  */
-const READONLY_METHODS = new Set(["GET", "HEAD"]);
 export function filterTools(
   tools: ToolDefinition[],
   options: FilterToolsOptions
