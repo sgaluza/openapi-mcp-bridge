@@ -89,21 +89,40 @@ function resolveRequestBody(
 export interface FilterToolsOptions {
   /** When true, only include read-only operations (GET and HEAD for OpenAPI) */
   readonly?: boolean;
+  /** Whitelist: only include tools whose names are in this list */
+  only?: string[];
+  /** Blacklist: exclude tools whose names are in this list */
+  exclude?: string[];
 }
 
 const READONLY_METHODS = new Set(["GET", "HEAD"]);
 
 /**
  * Filter tool definitions based on provided options.
+ * Filters are applied in order: readonly → only → exclude.
+ * Empty only/exclude arrays are treated as "no filter".
  */
 export function filterTools(
   tools: ToolDefinition[],
   options: FilterToolsOptions
 ): ToolDefinition[] {
+  let result = tools;
+
   if (options.readonly) {
-    return tools.filter((t) => READONLY_METHODS.has(t.method));
+    result = result.filter((t) => READONLY_METHODS.has(t.method));
   }
-  return tools;
+
+  if (options.only && options.only.length > 0) {
+    const onlySet = new Set(options.only);
+    result = result.filter((t) => onlySet.has(t.name));
+  }
+
+  if (options.exclude && options.exclude.length > 0) {
+    const excludeSet = new Set(options.exclude);
+    result = result.filter((t) => !excludeSet.has(t.name));
+  }
+
+  return result;
 }
 
 /**

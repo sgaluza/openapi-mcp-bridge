@@ -3,6 +3,7 @@ import { loadSpec, resolveRef, resolveSchemaRefs } from "../src/spec-loader.js";
 import { buildTools, filterTools } from "../src/tool-builder.js";
 import { resolveBaseUrl } from "../src/executor.js";
 import { resolveAuthHeaders, parseHeaderFlags } from "../src/auth.js";
+import { splitCsv, resolveFilterOptions } from "../src/commands/filter-options.js";
 import type { OpenAPISpec } from "../src/spec-loader.js";
 
 /** Minimal OpenAPI 3.0 spec fixture for testing */
@@ -223,6 +224,56 @@ describe("tool-builder", () => {
     expect(health!.hasBody).toBe(false);
     expect(health!.inputSchema.properties).toEqual({});
     expect(health!.inputSchema.required).toEqual([]);
+  });
+});
+
+describe("filterTools --only / --exclude", () => {
+  it("returns only listed tools when only is provided", () => {
+    const tools = buildTools(testSpec);
+    const result = filterTools(tools, { only: ["listUsers", "getUser"] });
+
+    expect(result).toHaveLength(2);
+    expect(result.map((t) => t.name)).toEqual(["listUsers", "getUser"]);
+  });
+
+  it("excludes listed tools when exclude is provided", () => {
+    const tools = buildTools(testSpec);
+    const result = filterTools(tools, { exclude: ["createUser", "delete_users_userId_posts_postId"] });
+
+    expect(result.find((t) => t.name === "createUser")).toBeUndefined();
+    expect(result.find((t) => t.name === "delete_users_userId_posts_postId")).toBeUndefined();
+    expect(result.length).toBe(tools.length - 2);
+  });
+
+  it("combines only and readonly (intersection)", () => {
+    const tools = buildTools(testSpec);
+    const result = filterTools(tools, { readonly: true, only: ["listUsers", "createUser"] });
+
+    // createUser is POST → filtered by readonly, listUsers is GET → passes both
+    expect(result).toHaveLength(1);
+    expect(result[0].name).toBe("listUsers");
+  });
+
+  it("combines exclude and readonly", () => {
+    const tools = buildTools(testSpec);
+    const result = filterTools(tools, { readonly: true, exclude: ["listUsers"] });
+
+    expect(result.find((t) => t.name === "listUsers")).toBeUndefined();
+    expect(result.every((t) => t.method === "GET" || t.method === "HEAD")).toBe(true);
+  });
+
+  it("ignores unknown names in only silently", () => {
+    const tools = buildTools(testSpec);
+    const result = filterTools(tools, { only: ["listUsers", "nonExistent"] });
+
+    expect(result).toHaveLength(1);
+    expect(result[0].name).toBe("listUsers");
+  });
+
+  it("returns all tools when only and exclude are empty arrays", () => {
+    const tools = buildTools(testSpec);
+    expect(filterTools(tools, { only: [] })).toHaveLength(tools.length);
+    expect(filterTools(tools, { exclude: [] })).toHaveLength(tools.length);
   });
 });
 
@@ -534,5 +585,77 @@ describe("executor - HTTP request building", () => {
 
     expect(result.isError).toBe(true);
     expect(result.content).toContain("Connection refused");
+  });
+});
+
+describe("resolveFilterOptions", () => {
+  it("exits with code 1 when both --only and --exclude are provided", () => {
+    const exitSpy = vi.spyOn(process, "exit").mockImplementation((() => {}) as never);
+    const stderrSpy = vi.spyOn(process.stderr, "write").mockImplementation(() => true);
+
+    resolveFilterOptions({ only: "foo", exclude: "bar" }, []);
+
+    expect(exitSpy).toHaveBeenCalledWith(1);
+    expect(stderrSpy).toHaveBeenCalledWith(expect.stringContaining("mutually exclusive"));
+
+    exitSpy.mockRestore();
+    stderrSpy.mockRestore();
+  });
+
+  it("warns on unknown operations in --only", () => {
+    const stderrSpy = vi.spyOn(process.stderr, "write").mockImplementation(() => true);
+    const tools = buildTools(testSpec);
+
+    resolveFilterOptions({ only: "nonExistent,alsoUnknown" }, tools);
+
+    expect(stderrSpy).toHaveBeenCalledWith(expect.stringContaining("unknown operations in --only"));
+    expect(stderrSpy).toHaveBeenCalledWith(expect.stringContaining("Hint:"));
+
+    stderrSpy.mockRestore();
+  });
+
+  it("warns on unknown operations in --exclude", () => {
+    const stderrSpy = vi.spyOn(process.stderr, "write").mockImplementation(() => true);
+    const tools = buildTools(testSpec);
+
+    resolveFilterOptions({ exclude: "nonExistent" }, tools);
+
+    expect(stderrSpy).toHaveBeenCalledWith(expect.stringContaining("unknown operations in --exclude"));
+
+    stderrSpy.mockRestore();
+  });
+
+  it("returns parsed only/exclude arrays without side effects for valid inputs", () => {
+    const tools = buildTools(testSpec);
+    const result = resolveFilterOptions({ only: "listUsers, getUser" }, tools);
+
+    expect(result.only).toEqual(["listUsers", "getUser"]);
+    expect(result.exclude).toBeUndefined();
+  });
+});
+
+describe("splitCsv", () => {
+  it("splits comma-separated values", () => {
+    expect(splitCsv("a,b,c")).toEqual(["a", "b", "c"]);
+  });
+
+  it("trims whitespace around values", () => {
+    expect(splitCsv("a , b , c")).toEqual(["a", "b", "c"]);
+  });
+
+  it("filters out empty segments", () => {
+    expect(splitCsv("a,,b")).toEqual(["a", "b"]);
+  });
+
+  it("returns single value without comma", () => {
+    expect(splitCsv("onlyOne")).toEqual(["onlyOne"]);
+  });
+
+  it("returns empty array for blank string", () => {
+    expect(splitCsv("")).toEqual([]);
+  });
+
+  it("handles leading/trailing commas", () => {
+    expect(splitCsv(",a,b,")).toEqual(["a", "b"]);
   });
 });
