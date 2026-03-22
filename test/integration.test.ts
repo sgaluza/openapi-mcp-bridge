@@ -226,6 +226,56 @@ describe("tool-builder", () => {
   });
 });
 
+describe("filterTools --only / --exclude", () => {
+  it("returns only listed tools when only is provided", () => {
+    const tools = buildTools(testSpec);
+    const result = filterTools(tools, { only: ["listUsers", "getUser"] });
+
+    expect(result).toHaveLength(2);
+    expect(result.map((t) => t.name)).toEqual(["listUsers", "getUser"]);
+  });
+
+  it("excludes listed tools when exclude is provided", () => {
+    const tools = buildTools(testSpec);
+    const result = filterTools(tools, { exclude: ["createUser", "delete_users_userId_posts_postId"] });
+
+    expect(result.find((t) => t.name === "createUser")).toBeUndefined();
+    expect(result.find((t) => t.name === "delete_users_userId_posts_postId")).toBeUndefined();
+    expect(result.length).toBe(tools.length - 2);
+  });
+
+  it("combines only and readonly (intersection)", () => {
+    const tools = buildTools(testSpec);
+    const result = filterTools(tools, { readonly: true, only: ["listUsers", "createUser"] });
+
+    // createUser is POST → filtered by readonly, listUsers is GET → passes both
+    expect(result).toHaveLength(1);
+    expect(result[0].name).toBe("listUsers");
+  });
+
+  it("combines exclude and readonly", () => {
+    const tools = buildTools(testSpec);
+    const result = filterTools(tools, { readonly: true, exclude: ["listUsers"] });
+
+    expect(result.find((t) => t.name === "listUsers")).toBeUndefined();
+    expect(result.every((t) => t.method === "GET" || t.method === "HEAD")).toBe(true);
+  });
+
+  it("ignores unknown names in only silently", () => {
+    const tools = buildTools(testSpec);
+    const result = filterTools(tools, { only: ["listUsers", "nonExistent"] });
+
+    expect(result).toHaveLength(1);
+    expect(result[0].name).toBe("listUsers");
+  });
+
+  it("returns all tools when only and exclude are empty arrays", () => {
+    const tools = buildTools(testSpec);
+    expect(filterTools(tools, { only: [] })).toHaveLength(tools.length);
+    expect(filterTools(tools, { exclude: [] })).toHaveLength(tools.length);
+  });
+});
+
 describe("filterTools --readonly", () => {
   it("returns only GET tools when readonly is true", () => {
     const tools = buildTools(testSpec);
