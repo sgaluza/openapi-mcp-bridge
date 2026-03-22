@@ -255,6 +255,14 @@ describe("filterTools --readonly", () => {
 
     expect(all.length).toBe(tools.length);
   });
+
+  it("does not mutate the original tools array", () => {
+    const tools = buildTools(testSpec);
+    const copy = [...tools];
+    filterTools(tools, { readonly: true });
+
+    expect(tools).toEqual(copy);
+  });
 });
 
 describe("resolveRef", () => {
