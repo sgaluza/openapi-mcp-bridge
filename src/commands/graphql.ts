@@ -18,8 +18,8 @@ export function registerGraphqlCommand(program: Command): void {
 GraphQL support is in development. Track progress at:
 https://github.com/sgaluza/api-to-mcp/issues/1`)
     .action((_endpoint: string, opts: { readonly?: boolean; only?: string; exclude?: string }) => {
-      if (opts.only || opts.exclude) {
-        process.stderr.write(chalk.yellow("Warning: --only and --exclude have no effect until GraphQL support is implemented.\n"));
+      if (opts.only || opts.exclude || opts.readonly) {
+        process.stderr.write(chalk.yellow("Warning: --only, --exclude, and --readonly have no effect until GraphQL support is implemented.\n"));
       }
       process.stderr.write(
         chalk.yellow("⚠ GraphQL support is coming soon.\n") +
