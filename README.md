@@ -19,6 +19,9 @@ npx @sgaluza/api-to-mcp https://api.example.com/openapi.yaml \
   --header "X-API-Key: pk_xxx" \
   --header "X-Custom: value"
 
+# Read-only mode (GET/HEAD only)
+npx @sgaluza/api-to-mcp https://api.example.com/openapi.yaml --readonly
+
 # Auth via env (auto-detects from securitySchemes in spec)
 API2MCP_API_KEY=pk_xxx npx @sgaluza/api-to-mcp https://api.example.com/openapi.yaml
 API2MCP_BEARER_TOKEN=token123 npx @sgaluza/api-to-mcp https://api.example.com/openapi.yaml

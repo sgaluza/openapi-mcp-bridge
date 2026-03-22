@@ -4,80 +4,67 @@ import {
   CallToolRequestSchema,
   ListToolsRequestSchema,
 } from "@modelcontextprotocol/sdk/types.js";
+import { Command } from "commander";
+import chalk from "chalk";
 import { loadSpec } from "./spec-loader.js";
-import { buildTools, type ToolDefinition } from "./tool-builder.js";
+import { buildTools, filterTools, type ToolDefinition } from "./tool-builder.js";
 import { executeToolCall, resolveBaseUrl } from "./executor.js";
 import { resolveAuthHeaders, parseHeaderFlags } from "./auth.js";
 
-/**
- * Parse CLI arguments.
- * Usage: api-to-mcp <spec-url-or-path> [--header "Name: Value"]...
- */
-function parseArgs(argv: string[]): {
+function parseCli(argv: string[]): {
   specSource: string;
   headers: string[];
+  readonly: boolean;
 } {
-  const args = argv.slice(2);
-  if (args[0] === "--help" || args[0] === "-h") {
-    console.error(
-      `Usage: @sgaluza/api-to-mcp <api-spec-url-or-path> [--header "Name: Value"]...
+  const program = new Command();
 
-Options:
-  --header, -H    Add a custom header to all API requests (repeatable)
-
+  program
+    .name("api-to-mcp")
+    .description("Turn any API (OpenAPI, GraphQL coming soon) into an MCP server via stdio bridge.")
+    .argument("[spec]", "API spec URL or file path")
+    .option("-H, --header <header>", "Add a request header (repeatable)", (val, acc: string[]) => [...acc, val], [])
+    .option("--readonly", "Expose only read-only operations (GET/HEAD)")
+    .addHelpText("after", `
 Environment variables:
   API2MCP_SPEC_URL      API spec URL or path (alternative to positional arg)
   API2MCP_API_KEY       API key (uses securitySchemes from spec to determine header)
   API2MCP_BEARER_TOKEN  Bearer token (adds Authorization: Bearer header)
 
-  Legacy aliases (still supported): OPENAPI_SPEC_URL, OPENAPI_API_KEY, OPENAPI_BEARER_TOKEN
+  Legacy aliases: OPENAPI_SPEC_URL, OPENAPI_API_KEY, OPENAPI_BEARER_TOKEN
 
 Examples:
-  npx @sgaluza/api-to-mcp https://api.example.com/openapi.yaml
-  npx @sgaluza/api-to-mcp ./openapi.yaml --header "X-API-Key: pk_xxx"
-  API2MCP_SPEC_URL=https://api.example.com/openapi.yaml npx @sgaluza/api-to-mcp`
-    );
-    process.exit(0);
-  }
+  $ npx @sgaluza/api-to-mcp https://api.example.com/openapi.yaml
+  $ npx @sgaluza/api-to-mcp ./openapi.yaml -H "X-API-Key: pk_xxx"
+  $ npx @sgaluza/api-to-mcp https://api.example.com/openapi.yaml --readonly
+  $ API2MCP_SPEC_URL=https://api.example.com/openapi.yaml npx @sgaluza/api-to-mcp`);
 
-  const specSource = args[0] || process.env.API2MCP_SPEC_URL || process.env.OPENAPI_SPEC_URL;
+  program.parse(argv);
+
+  const opts = program.opts<{ header: string[]; readonly?: boolean }>();
+  const specSource = program.args[0] || process.env.API2MCP_SPEC_URL || process.env.OPENAPI_SPEC_URL;
+
   if (!specSource) {
-    console.error(
-      "Error: No spec source provided. Pass as argument or set API2MCP_SPEC_URL env var."
-    );
+    process.stderr.write(chalk.red("Error: no spec source provided. Pass as argument or set API2MCP_SPEC_URL.\n"));
     process.exit(1);
   }
-  const headers: string[] = [];
 
-  let i = 1;
-  while (i < args.length) {
-    if (args[i] === "--header" || args[i] === "-H") {
-      i++;
-      if (i >= args.length) {
-        console.error("Error: --header requires a value");
-        process.exit(1);
-      }
-      headers.push(args[i]);
-    } else {
-      console.error(`Unknown argument: ${args[i]}`);
-      process.exit(1);
-    }
-    i++;
-  }
-
-  return { specSource, headers };
+  return {
+    specSource,
+    headers: opts.header,
+    readonly: opts.readonly ?? false,
+  };
 }
 
 async function main() {
-  const { specSource, headers } = parseArgs(process.argv);
+  const { specSource, headers, readonly } = parseCli(process.argv);
 
   // Load and parse the API spec
   const spec = await loadSpec(specSource);
   const serverName = spec.info.title || "api-to-mcp";
   const serverVersion = spec.info.version || "0.1.0";
 
-  // Build tool definitions from the spec
-  const tools = buildTools(spec);
+  // Build and filter tool definitions from the spec
+  const tools = filterTools(buildTools(spec), { readonly });
   const toolMap = new Map<string, ToolDefinition>();
   for (const tool of tools) {
     toolMap.set(tool.name, tool);
@@ -134,14 +121,20 @@ async function main() {
   const transport = new StdioServerTransport();
   await server.connect(transport);
 
-  // Log to stderr (stdout is used for MCP protocol)
-  console.error(
-    `${serverName} v${serverVersion} — ${tools.length} tools loaded from ${specSource}`
+  // Log startup info to stderr (stdout is reserved for MCP protocol)
+  const readonlyBadge = readonly ? chalk.yellow(" [readonly]") : "";
+  process.stderr.write(
+    chalk.green("✓") + ` ${chalk.bold(serverName)} v${serverVersion}${readonlyBadge}\n`
   );
-  console.error(`Base URL: ${baseUrl}`);
+  process.stderr.write(
+    chalk.cyan("⚡") + ` ${tools.length} tools loaded from ${chalk.dim(specSource)}\n`
+  );
+  process.stderr.write(
+    chalk.cyan("🌐") + ` Base URL: ${chalk.dim(baseUrl)}\n`
+  );
 }
 
 main().catch((error) => {
-  console.error("Fatal error:", error.message || error);
+  process.stderr.write(chalk.red("✗ Fatal error: ") + (error.message || error) + "\n");
   process.exit(1);
 });

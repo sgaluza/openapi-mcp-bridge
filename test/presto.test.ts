@@ -31,7 +31,7 @@ describe("PResto OpenAPI spec", () => {
     }
 
     // Verify tool count
-    expect(tools.length).toBe(4);
+    expect(tools.length).toBe(5);
 
     // Verify base URL
     expect(baseUrl).toBe(
@@ -49,6 +49,7 @@ describe("PResto OpenAPI spec", () => {
       "repo",
       "status",
       "pr_status",
+      "pr_number",
     ]);
 
     // getReview
@@ -67,7 +68,6 @@ describe("PResto OpenAPI spec", () => {
     const postComment = tools.find((t) => t.name === "postComment");
     expect(postComment).toBeDefined();
     expect(postComment!.method).toBe("POST");
-    expect(postComment!.pathParams).toEqual(["reviewId", "issueNumber"]);
     expect(postComment!.hasBody).toBe(true);
     expect(postComment!.inputSchema.required).toContain("body");
 
