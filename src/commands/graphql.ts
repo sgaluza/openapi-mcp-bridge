@@ -18,7 +18,7 @@ export function registerGraphqlCommand(program: Command): void {
     .addHelpText("after", `
 GraphQL support is in development. Track progress at:
 https://github.com/sgaluza/api-to-mcp/issues/1`)
-    .action((_endpoint: string, opts: { readonly?: boolean; only?: string; exclude?: string; bind?: string }) => {
+    .action((_endpoint: string, opts: { readonly?: boolean; only?: string; exclude?: string; bind?: string[] }) => {
       process.stderr.write(
         chalk.yellow("⚠ GraphQL support is coming soon.\n") +
         (opts.only || opts.exclude || opts.readonly || opts.bind

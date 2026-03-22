@@ -674,6 +674,21 @@ describe("parseBindings", () => {
     expect(parseBindings([" teamId =TEAM_ABC"])).toEqual({ teamId: "TEAM_ABC" });
   });
 
+  it("trims whitespace from value", () => {
+    expect(parseBindings(["teamId= TEAM_ABC "])).toEqual({ teamId: "TEAM_ABC" });
+  });
+
+  it("skips reserved param 'body' with a warning", () => {
+    const stderrSpy = vi.spyOn(process.stderr, "write").mockImplementation(() => true);
+
+    const result = parseBindings(["body=something"]);
+
+    expect(result).toEqual({});
+    expect(stderrSpy).toHaveBeenCalledWith(expect.stringContaining("reserved parameter 'body'"));
+
+    stderrSpy.mockRestore();
+  });
+
   it("skips entries without =", () => {
     expect(parseBindings(["noequals"])).toEqual({});
   });

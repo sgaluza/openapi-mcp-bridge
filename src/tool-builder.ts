@@ -102,6 +102,9 @@ const READONLY_METHODS = new Set(["GET", "HEAD"]);
  * Bound params are hidden from the MCP client — the bridge injects their
  * values automatically at call time via the bindings map.
  * Applies to path params, query params, and top-level properties.
+ *
+ * Returns the original array unchanged when bindings is empty
+ * (performance optimisation — avoids unnecessary allocation).
  */
 export function applyBindings(
   tools: ToolDefinition[],
