@@ -55,7 +55,15 @@ Examples:
       const tools = filterTools(allTools, { readonly, only, exclude });
 
       if (tools.length === 0) {
-        process.stderr.write(chalk.red("Error: no tools remaining after filtering. Check --only/--exclude/--readonly flags.\n"));
+        const applied = [
+          readonly && "readonly",
+          opts.only && `only=${opts.only}`,
+          opts.exclude && `exclude=${opts.exclude}`,
+        ].filter(Boolean).join(", ");
+        process.stderr.write(chalk.red(
+          `Error: no tools remaining after filtering (had ${allTools.length} tools before filters).\n` +
+          `Applied filters: ${applied}\n`
+        ));
         process.exit(1);
       }
 
