@@ -11,10 +11,11 @@ export interface AuthConfig {
  * Resolve authentication headers from CLI flags, environment variables,
  * and the OpenAPI spec's securitySchemes.
  *
- * Priority:
- * 1. Explicit --header flags (highest priority)
+ * Priority (highest wins):
+ * 1. Explicit --header flags
  * 2. API2MCP_BEARER_TOKEN env → Authorization: Bearer {token}
- * 3. API2MCP_API_KEY env → uses securitySchemes to determine header name and location
+ * 3. API2MCP_AUTH_TOKEN env → Authorization: {raw value, no prefix}
+ * 4. API2MCP_API_KEY env → uses securitySchemes to determine header name and location
  *
  * Legacy OPENAPI_* variables are supported as aliases for backwards compatibility.
  */
@@ -24,7 +25,13 @@ export function resolveAuthHeaders(
 ): Record<string, string> {
   const headers: Record<string, string> = {};
 
-  // 1. API2MCP_BEARER_TOKEN from env (OPENAPI_BEARER_TOKEN as legacy alias)
+  // 1. API2MCP_AUTH_TOKEN — raw Authorization header value (e.g. Linear API keys)
+  const authToken = config.env.API2MCP_AUTH_TOKEN;
+  if (authToken) {
+    headers["Authorization"] = authToken;
+  }
+
+  // 2. API2MCP_BEARER_TOKEN from env — overrides AUTH_TOKEN (OPENAPI_BEARER_TOKEN as legacy alias)
   const bearerToken = config.env.API2MCP_BEARER_TOKEN ?? config.env.OPENAPI_BEARER_TOKEN;
   if (bearerToken) {
     headers["Authorization"] = `Bearer ${bearerToken}`;

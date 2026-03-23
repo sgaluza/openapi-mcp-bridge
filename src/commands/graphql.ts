@@ -63,6 +63,8 @@ Examples:
 
       // Build auth headers from env vars and --header flags
       const authHeaders: Record<string, string> = {};
+      const authToken = process.env.API2MCP_AUTH_TOKEN;
+      if (authToken) authHeaders["Authorization"] = authToken;
       const bearerToken =
         process.env.API2MCP_BEARER_TOKEN ?? process.env.OPENAPI_BEARER_TOKEN;
       if (bearerToken) authHeaders["Authorization"] = `Bearer ${bearerToken}`;

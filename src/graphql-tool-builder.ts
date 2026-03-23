@@ -61,25 +61,30 @@ function buildGqlTypeString(typeRef: IntrospectionTypeRef): string {
  * Convert a GraphQL type reference to a JSON Schema object for use in MCP tool input schemas.
  * Handles: scalars, enums, INPUT_OBJECTs (with recursive field mapping), LISTs, NON_NULL.
  *
+ * INPUT_OBJECT expansion is limited to 1 level deep to prevent combinatorial explosion
+ * on schemas with deeply nested filter/input types (e.g. Linear, GitHub GraphQL APIs).
+ *
  * @param typeRef - The type reference to convert
  * @param typeMap - Map of type name → IntrospectionType built from the schema
  * @param visited - Set of type names already being resolved (circular reference guard)
+ * @param inputDepth - Current INPUT_OBJECT nesting depth (capped at 1)
  */
 export function graphqlTypeToJsonSchema(
   typeRef: IntrospectionTypeRef,
   typeMap: Map<string, IntrospectionType>,
-  visited = new Set<string>()
+  visited = new Set<string>(),
+  inputDepth = 0
 ): JSONSchema {
   // NON_NULL is a modifier — unwrap and convert the inner type
   if (typeRef.kind === "NON_NULL") {
-    return graphqlTypeToJsonSchema(typeRef.ofType!, typeMap, visited);
+    return graphqlTypeToJsonSchema(typeRef.ofType!, typeMap, visited, inputDepth);
   }
 
   // LIST → JSON Schema array
   if (typeRef.kind === "LIST") {
     return {
       type: "array",
-      items: graphqlTypeToJsonSchema(typeRef.ofType!, typeMap, visited),
+      items: graphqlTypeToJsonSchema(typeRef.ofType!, typeMap, visited, inputDepth),
     };
   }
 
@@ -111,6 +116,10 @@ export function graphqlTypeToJsonSchema(
 
   if (type.kind === "INPUT_OBJECT") {
     if (visited.has(name)) return { type: "object" }; // Circular reference guard
+    // Stop expanding nested INPUT_OBJECTs beyond depth 1 to avoid memory explosion
+    // on schemas with deeply nested filter types (e.g. Linear has 6+ levels of filters).
+    if (inputDepth >= 1) return { type: "object", description: `${name} input object` };
+
     visited = new Set(visited);
     visited.add(name);
 
@@ -119,7 +128,7 @@ export function graphqlTypeToJsonSchema(
 
     for (const field of type.inputFields ?? []) {
       properties[field.name] = {
-        ...graphqlTypeToJsonSchema(field.type, typeMap, new Set(visited)),
+        ...graphqlTypeToJsonSchema(field.type, typeMap, new Set(visited), inputDepth + 1),
         ...(field.description ? { description: field.description } : {}),
       };
       if (isRequired(field.type)) required.push(field.name);
@@ -201,10 +210,9 @@ export function buildSelectionSet(
         );
         if (sub) {
           selections.push(`${field.name} ${sub}`);
-        } else {
-          // Object type with no selectable fields — include field name as scalar fallback
-          selections.push(field.name);
         }
+        // No sub-selection generated (e.g. connection types with only nested objects) — skip.
+        // Including the field without { ... } would produce an invalid GraphQL query.
       }
       // depth >= 1: nested objects are skipped (beyond depth limit)
     }

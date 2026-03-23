@@ -495,6 +495,22 @@ describe("auth", () => {
     expect(headers["Authorization"]).toBe("Bearer my-token");
   });
 
+  it("resolves API2MCP_AUTH_TOKEN as raw Authorization header (no Bearer prefix)", () => {
+    const headers = resolveAuthHeaders(testSpec, {
+      cliHeaders: {},
+      env: { API2MCP_AUTH_TOKEN: "lin_api_xxx" },
+    });
+    expect(headers["Authorization"]).toBe("lin_api_xxx");
+  });
+
+  it("BEARER_TOKEN overrides AUTH_TOKEN when both are set", () => {
+    const headers = resolveAuthHeaders(testSpec, {
+      cliHeaders: {},
+      env: { API2MCP_AUTH_TOKEN: "raw-token", API2MCP_BEARER_TOKEN: "bearer-token" },
+    });
+    expect(headers["Authorization"]).toBe("Bearer bearer-token");
+  });
+
   it("CLI headers override env-based auth", () => {
     const headers = resolveAuthHeaders(testSpec, {
       cliHeaders: { "X-API-Key": "cli-key" },
