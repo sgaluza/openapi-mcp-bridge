@@ -1,11 +1,12 @@
 import type { Command } from "commander";
 import chalk from "chalk";
 import { loadSpec } from "../spec-loader.js";
-import { buildTools, filterTools } from "../tool-builder.js";
+import { buildTools, filterTools, applyBindings } from "../tool-builder.js";
 import { executeToolCall, resolveBaseUrl } from "../executor.js";
 import { resolveAuthHeaders, parseHeaderFlags } from "../auth.js";
 import { startMcpServer } from "../mcp-server.js";
 import { resolveFilterOptions } from "./filter-options.js";
+import { parseBindings } from "./bind-options.js";
 
 const collect = (val: string, acc: string[]) => [...acc, val];
 
@@ -21,6 +22,7 @@ export function registerRestCommand(program: Command): void {
     .option("--readonly", "Expose only read-only operations (GET/HEAD)")
     .option("--only <operations>", "Whitelist operations by name, comma-separated")
     .option("--exclude <operations>", "Blacklist operations by name, comma-separated")
+    .option("--bind <binding>", "Pre-bind a parameter to a fixed value: key=value (repeatable)", collect, [])
     .addHelpText("after", `
 Environment variables:
   API2MCP_SPEC_URL      OpenAPI spec URL or path (alternative to positional arg)
@@ -35,8 +37,9 @@ Examples:
   $ api-to-mcp rest https://api.example.com/openapi.yaml --readonly
   $ api-to-mcp rest spec.yaml --only "getIssue,listIssues"
   $ api-to-mcp rest spec.yaml --exclude "deleteIssue,archiveProject"
+  $ api-to-mcp rest spec.yaml --bind "teamId=TEAM_ABC" --bind "projectId=PROJ_XYZ"
   $ API2MCP_SPEC_URL=https://api.example.com/openapi.yaml api-to-mcp rest`)
-    .action(async (specArg: string | undefined, opts: { header: string[]; readonly?: boolean; only?: string; exclude?: string }) => {
+    .action(async (specArg: string | undefined, opts: { header: string[]; readonly?: boolean; only?: string; exclude?: string; bind: string[] }) => {
       const specSource = specArg || process.env.API2MCP_SPEC_URL || process.env.OPENAPI_SPEC_URL;
 
       if (!specSource) {
@@ -45,20 +48,32 @@ Examples:
       }
 
       const readonly = opts.readonly ?? false;
+      const bindings = parseBindings(opts.bind);
 
       const spec = await loadSpec(specSource);
       const serverName = spec.info.title || "api-to-mcp";
       const serverVersion = spec.info.version || "0.1.0";
 
       const allTools = buildTools(spec);
-      const { only, exclude } = resolveFilterOptions(opts, allTools);
-      const tools = filterTools(allTools, { readonly, only, exclude });
+
+      // Warn if any binding key doesn't match a parameter in any tool
+      const allParamNames = new Set(allTools.flatMap((t) => Object.keys(t.inputSchema.properties)));
+      for (const key of Object.keys(bindings)) {
+        if (!allParamNames.has(key)) {
+          process.stderr.write(chalk.yellow(`Warning: --bind key '${key}' not found in any tool. Check for typos.\n`));
+        }
+      }
+
+      const bound = applyBindings(allTools, bindings);
+      const { only, exclude } = resolveFilterOptions(opts, bound);
+      const tools = filterTools(bound, { readonly, only, exclude });
 
       if (tools.length === 0) {
         const applied = [
           readonly && "readonly",
           opts.only && `only=${opts.only}`,
           opts.exclude && `exclude=${opts.exclude}`,
+          Object.keys(bindings).length > 0 && `bind=[${Object.keys(bindings).join(", ")}]`,
         ].filter(Boolean).join(", ");
         process.stderr.write(chalk.red(
           `Error: no tools remaining after filtering (had ${allTools.length} tools before filters).\n` +
@@ -80,7 +95,7 @@ Examples:
         specSource,
         baseUrl,
         readonly,
-        executeCall: (tool, args) => executeToolCall(tool, args, baseUrl, authHeaders),
+        executeCall: (tool, args) => executeToolCall(tool, { ...args, ...bindings }, baseUrl, authHeaders),
       });
     });
 }
