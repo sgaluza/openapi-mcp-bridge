@@ -23,7 +23,7 @@ https://github.com/sgaluza/api-to-mcp/issues/1`)
     .action((_endpoint: string, opts: { readonly?: boolean; only?: string; exclude?: string; bind: string[] }) => {
       process.stderr.write(
         chalk.yellow("⚠ GraphQL support is coming soon.\n") +
-        (opts.only || opts.exclude || opts.readonly || opts.bind
+        (opts.only || opts.exclude || opts.readonly || opts.bind.length > 0
           ? chalk.yellow("  Note: --only, --exclude, --readonly, and --bind will be available after implementation.\n")
           : "") +
         `  Track progress: ${chalk.dim("https://github.com/sgaluza/api-to-mcp/issues/1")}\n`
