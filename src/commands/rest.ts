@@ -55,6 +55,15 @@ Examples:
       const serverVersion = spec.info.version || "0.1.0";
 
       const allTools = buildTools(spec);
+
+      // Warn if any binding key doesn't match a parameter in any tool
+      const allParamNames = new Set(allTools.flatMap((t) => Object.keys(t.inputSchema.properties)));
+      for (const key of Object.keys(bindings)) {
+        if (!allParamNames.has(key)) {
+          process.stderr.write(chalk.yellow(`Warning: --bind key '${key}' not found in any tool. Check for typos.\n`));
+        }
+      }
+
       const bound = applyBindings(allTools, bindings);
       const { only, exclude } = resolveFilterOptions(opts, bound);
       const tools = filterTools(bound, { readonly, only, exclude });
