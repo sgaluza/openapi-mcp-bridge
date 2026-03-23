@@ -842,6 +842,29 @@ describe("loadGraphQLSchema — introspection via HTTP", () => {
       "missing __schema"
     );
   });
+
+  it("throws with descriptive error when endpoint returns non-JSON body", async () => {
+    vi.mocked(fetch).mockResolvedValue({
+      ok: true,
+      json: async () => { throw new SyntaxError("Unexpected token < in JSON"); },
+    } as unknown as Response);
+
+    await expect(loadGraphQLSchema("https://api.example.com/graphql")).rejects.toThrow(
+      "GraphQL endpoint returned invalid JSON"
+    );
+  });
+
+  it("throws with string representation when json() throws a non-Error", async () => {
+    vi.mocked(fetch).mockResolvedValue({
+      ok: true,
+      // eslint-disable-next-line @typescript-eslint/only-throw-error
+      json: async () => { throw "raw string error"; },
+    } as unknown as Response);
+
+    await expect(loadGraphQLSchema("https://api.example.com/graphql")).rejects.toThrow(
+      "GraphQL endpoint returned invalid JSON: raw string error"
+    );
+  });
 });
 
 describe("loadGraphQLSchema — SDL file", () => {

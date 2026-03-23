@@ -147,10 +147,16 @@ async function fetchIntrospection(
     );
   }
 
-  const result = (await response.json()) as {
-    data?: { __schema: IntrospectionSchema };
-    errors?: unknown[];
-  };
+  let result: { data?: { __schema: IntrospectionSchema }; errors?: unknown[] };
+  try {
+    result = (await response.json()) as typeof result;
+  } catch (error) {
+    throw new Error(
+      `GraphQL endpoint returned invalid JSON: ${
+        error instanceof Error ? error.message : String(error)
+      }`
+    );
+  }
 
   if (result.errors?.length) {
     throw new Error(
