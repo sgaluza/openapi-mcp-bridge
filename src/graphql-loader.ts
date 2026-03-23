@@ -154,7 +154,8 @@ async function fetchIntrospection(
     throw new Error(
       `GraphQL endpoint returned invalid JSON: ${
         error instanceof Error ? error.message : String(error)
-      }`
+      }`,
+      { cause: error }
     );
   }
 
