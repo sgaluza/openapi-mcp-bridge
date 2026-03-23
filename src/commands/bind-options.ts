@@ -30,6 +30,12 @@ export function parseBindings(flags: string[]): Record<string, string> {
       ));
       continue;
     }
+    if (!value) {
+      process.stderr.write(chalk.yellow(`Warning: --bind '${key}' has an empty value — this may cause API errors.\n`));
+    }
+    if (key in bindings) {
+      process.stderr.write(chalk.yellow(`Warning: duplicate --bind key '${key}' — using last value '${value}' (was '${bindings[key]}').\n`));
+    }
     bindings[key] = value;
   }
   return bindings;

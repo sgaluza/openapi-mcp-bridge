@@ -707,6 +707,28 @@ describe("parseBindings", () => {
       projectId: "P2",
     });
   });
+
+  it("last value wins when key is duplicated", () => {
+    const stderrSpy = vi.spyOn(process.stderr, "write").mockImplementation(() => true);
+
+    const result = parseBindings(["teamId=A", "teamId=B"]);
+
+    expect(result).toEqual({ teamId: "B" });
+    expect(stderrSpy).toHaveBeenCalledWith(expect.stringContaining("duplicate --bind key 'teamId'"));
+
+    stderrSpy.mockRestore();
+  });
+
+  it("allows empty value and warns", () => {
+    const stderrSpy = vi.spyOn(process.stderr, "write").mockImplementation(() => true);
+
+    const result = parseBindings(["key="]);
+
+    expect(result).toEqual({ key: "" });
+    expect(stderrSpy).toHaveBeenCalledWith(expect.stringContaining("empty value"));
+
+    stderrSpy.mockRestore();
+  });
 });
 
 describe("applyBindings", () => {

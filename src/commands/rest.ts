@@ -64,7 +64,7 @@ Examples:
           readonly && "readonly",
           opts.only && `only=${opts.only}`,
           opts.exclude && `exclude=${opts.exclude}`,
-          opts.bind.length > 0 && `bind=${opts.bind.join(",")}`,
+          Object.keys(bindings).length > 0 && `bind=[${Object.keys(bindings).join(", ")}]`,
         ].filter(Boolean).join(", ");
         process.stderr.write(chalk.red(
           `Error: no tools remaining after filtering (had ${allTools.length} tools before filters).\n` +
