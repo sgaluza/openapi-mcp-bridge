@@ -92,6 +92,7 @@ export async function executeGraphQLCall(
         isError: false,
       };
     } catch {
+      // Non-JSON response (e.g. HTML error page from a proxy) — return raw text as-is
       return { content: responseText, isError: false };
     }
   } catch (error) {

@@ -219,6 +219,7 @@ export function buildSelectionSet(
     nextVisited.add(name);
 
     const fragments: string[] = ["__typename"];
+    // Limit to 3 union members to keep selection sets manageable in MCP tool descriptions.
     for (const pt of type.possibleTypes.slice(0, 3)) {
       const ptRef: IntrospectionTypeRef = {
         kind: "OBJECT",

@@ -180,12 +180,27 @@ async function loadSDLFile(filePath: string): Promise<IntrospectionSchema> {
   try {
     schema = buildSchema(sdlText);
   } catch (error) {
-    throw new Error(`Failed to parse GraphQL SDL file "${filePath}": ${error}`);
+    throw new Error(
+      `Failed to parse GraphQL SDL file "${filePath}": ${
+        error instanceof Error ? error.message : String(error)
+      }`,
+      { cause: error }
+    );
   }
 
-  const result = graphqlSync({ schema, source: getIntrospectionQuery() }) as {
-    data: { __schema: IntrospectionSchema };
-  };
+  const result = graphqlSync({ schema, source: getIntrospectionQuery() });
 
-  return result.data.__schema;
+  if (result.errors?.length) {
+    throw new Error(
+      `GraphQL introspection failed for SDL file "${filePath}": ${JSON.stringify(result.errors)}`
+    );
+  }
+
+  if (!result.data?.__schema) {
+    throw new Error(
+      `Invalid introspection result from SDL file "${filePath}": missing __schema`
+    );
+  }
+
+  return result.data.__schema as IntrospectionSchema;
 }
