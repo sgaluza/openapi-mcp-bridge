@@ -1,8 +1,8 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { loadSpec, resolveRef, resolveSchemaRefs } from "../src/spec-loader.js";
 import { buildTools, filterTools, applyBindings } from "../src/tool-builder.js";
 import { parseBindings } from "../src/commands/bind-options.js";
-import { resolveBaseUrl } from "../src/executor.js";
+import { resolveBaseUrl, executeToolCall } from "../src/executor.js";
 import { resolveAuthHeaders, parseHeaderFlags } from "../src/auth.js";
 import { splitCsv, resolveFilterOptions } from "../src/commands/filter-options.js";
 import type { OpenAPISpec } from "../src/spec-loader.js";
@@ -337,6 +337,19 @@ describe("resolveRef", () => {
       resolveRef(testSpec, "#/components/schemas/NonExistent")
     ).toThrow("$ref not found");
   });
+
+  it("throws when path traversal hits a non-object mid-path", () => {
+    const spec = {
+      components: {
+        schemas: {
+          Flat: "not-an-object",
+        },
+      },
+    } as unknown as typeof testSpec;
+    expect(() =>
+      resolveRef(spec, "#/components/schemas/Flat/nested")
+    ).toThrow("Cannot resolve $ref");
+  });
 });
 
 describe("resolveSchemaRefs", () => {
@@ -357,6 +370,37 @@ describe("resolveSchemaRefs", () => {
         },
       },
     });
+  });
+
+  it("resolves allOf / oneOf / anyOf items", () => {
+    const schema = {
+      allOf: [
+        { type: "object", properties: { a: { type: "string" } } },
+        { $ref: "#/components/schemas/UserUpdate" },
+      ],
+    };
+    const resolved = resolveSchemaRefs(testSpec, schema) as Record<string, unknown>;
+    expect(Array.isArray(resolved.allOf)).toBe(true);
+    const parts = resolved.allOf as unknown[];
+    expect(parts).toHaveLength(2);
+    expect(parts[1]).toMatchObject({ type: "object", properties: { name: { type: "string" } } });
+  });
+
+  it("resolves additionalProperties $ref", () => {
+    const specWithAdditional: OpenAPISpec = {
+      ...testSpec,
+      components: {
+        schemas: {
+          Tag: { type: "string" },
+        },
+      },
+    };
+    const schema = {
+      type: "object",
+      additionalProperties: { $ref: "#/components/schemas/Tag" },
+    };
+    const resolved = resolveSchemaRefs(specWithAdditional, schema);
+    expect(resolved.additionalProperties).toEqual({ type: "string" });
   });
 
   it("handles circular references gracefully", () => {
@@ -457,6 +501,40 @@ describe("auth", () => {
       env: { OPENAPI_API_KEY: "env-key" },
     });
     expect(headers["X-API-Key"]).toBe("cli-key");
+  });
+
+  it("stores API key as __query: marker when scheme.in is query", () => {
+    const queryKeySpec: OpenAPISpec = {
+      ...testSpec,
+      components: {
+        ...testSpec.components,
+        securitySchemes: {
+          apiKey: { type: "apiKey", name: "api_key", in: "query" },
+        },
+      },
+    };
+    const headers = resolveAuthHeaders(queryKeySpec, {
+      cliHeaders: {},
+      env: { OPENAPI_API_KEY: "secret" },
+    });
+    expect(headers["__query:api_key"]).toBe("secret");
+  });
+
+  it("falls back to X-API-Key when no apiKey-type security scheme exists", () => {
+    const bearerOnlySpec: OpenAPISpec = {
+      ...testSpec,
+      components: {
+        ...testSpec.components,
+        securitySchemes: {
+          bearerAuth: { type: "http", scheme: "bearer" } as unknown as import("../src/auth.js").SecurityScheme,
+        },
+      },
+    };
+    const headers = resolveAuthHeaders(bearerOnlySpec, {
+      cliHeaders: {},
+      env: { OPENAPI_API_KEY: "fallback-key" },
+    });
+    expect(headers["X-API-Key"]).toBe("fallback-key");
   });
 });
 
@@ -793,5 +871,331 @@ describe("applyBindings", () => {
     const [bound] = applyBindings([getUser], { someOtherParam: "x" });
 
     expect(bound.inputSchema.properties).toHaveProperty("userId");
+  });
+});
+
+// ─── executeToolCall ──────────────────────────────────────────────────────────
+
+describe("executeToolCall", () => {
+  beforeEach(() => {
+    vi.stubGlobal("fetch", vi.fn());
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  const pathTool = {
+    name: "getUser",
+    description: "Get user",
+    inputSchema: { type: "object" as const, properties: { userId: { type: "string" } }, required: ["userId"] },
+    method: "GET",
+    pathTemplate: "/users/{userId}",
+    pathParams: ["userId"],
+    queryParams: [],
+    hasBody: false,
+  };
+
+  it("returns error when required path param is missing from args", async () => {
+    const result = await executeToolCall(pathTool, {}, "https://api.example.com", {});
+    expect(result.isError).toBe(true);
+    expect(result.content).toContain("Missing required path parameter: userId");
+  });
+
+  it("sends API key as query param when authHeaders contains __query: marker", async () => {
+    const tool = { ...pathTool, pathParams: [], pathTemplate: "/users" };
+    vi.mocked(fetch).mockResolvedValue({
+      ok: true,
+      text: async () => "[]",
+    } as Response);
+
+    await executeToolCall(tool, {}, "https://api.example.com", {
+      "__query:api_key": "secret123",
+    });
+
+    const [url] = vi.mocked(fetch).mock.calls[0] as [string, RequestInit];
+    expect(url).toContain("api_key=secret123");
+    expect(url).not.toContain("__query");
+  });
+
+  it("returns non-JSON response as plain text", async () => {
+    const tool = { ...pathTool, pathParams: [], pathTemplate: "/health" };
+    vi.mocked(fetch).mockResolvedValue({
+      ok: true,
+      text: async () => "OK",
+    } as Response);
+
+    const result = await executeToolCall(tool, {}, "https://api.example.com", {});
+    expect(result.isError).toBe(false);
+    expect(result.content).toBe("OK");
+  });
+
+  it("returns isError: true on non-Error network rejection", async () => {
+    const tool = { ...pathTool, pathParams: [], pathTemplate: "/users" };
+    vi.mocked(fetch).mockRejectedValue("connection refused");
+
+    const result = await executeToolCall(tool, {}, "https://api.example.com", {});
+    expect(result.isError).toBe(true);
+    expect(result.content).toContain("connection refused");
+  });
+});
+
+// ─── buildTools — edge cases ──────────────────────────────────────────────────
+
+describe("resolveBaseUrl — relative server URL with local file source", () => {
+  it("returns localhost URL when servers URL is relative and source is a local file", () => {
+    expect(resolveBaseUrl("/api/v1", "./spec.yaml")).toBe("http://localhost/api/v1");
+  });
+
+  it("handles relative server URL without leading slash", () => {
+    expect(resolveBaseUrl("api/v1", "./spec.yaml")).toBe("http://localhost/api/v1");
+  });
+});
+
+describe("buildTools — $ref requestBody", () => {
+  it("resolves $ref request body from components", () => {
+    const spec: OpenAPISpec = {
+      openapi: "3.0.0",
+      info: { title: "T", version: "1" },
+      paths: {
+        "/users": {
+          post: {
+            operationId: "createUser",
+            requestBody: { $ref: "#/components/requestBodies/UserBody" },
+          },
+        },
+      },
+      components: {
+        requestBodies: {
+          UserBody: {
+            required: true,
+            content: {
+              "application/json": {
+                schema: { type: "object", properties: { name: { type: "string" } } },
+              },
+            },
+          },
+        },
+      },
+    };
+
+    const tools = buildTools(spec);
+    const tool = tools.find((t) => t.name === "createUser")!;
+    expect(tool.hasBody).toBe(true);
+    expect(tool.inputSchema.properties).toHaveProperty("body");
+  });
+});
+
+describe("buildTools — $ref parameter", () => {
+  it("resolves $ref parameter from components", () => {
+    const spec: OpenAPISpec = {
+      openapi: "3.0.0",
+      info: { title: "T", version: "1" },
+      paths: {
+        "/users": {
+          get: {
+            operationId: "listUsers",
+            parameters: [{ $ref: "#/components/parameters/PageParam" }],
+          },
+        },
+      },
+      components: {
+        parameters: {
+          PageParam: { name: "page", in: "query", schema: { type: "integer" } },
+        },
+      },
+    };
+
+    const tools = buildTools(spec);
+    const tool = tools.find((t) => t.name === "listUsers")!;
+    expect(tool.inputSchema.properties).toHaveProperty("page");
+    expect(tool.queryParams).toContain("page");
+  });
+});
+
+describe("buildTools — requestBody with */* content type and description", () => {
+  it("uses */* content type as fallback when application/json is absent", () => {
+    const spec: OpenAPISpec = {
+      openapi: "3.0.0",
+      info: { title: "T", version: "1" },
+      paths: {
+        "/upload": {
+          post: {
+            operationId: "upload",
+            requestBody: {
+              content: {
+                "*/*": { schema: { type: "object", properties: { data: { type: "string" } } } },
+              },
+            },
+          },
+        },
+      },
+    };
+
+    const tools = buildTools(spec);
+    const tool = tools.find((t) => t.name === "upload")!;
+    expect(tool.hasBody).toBe(true);
+    expect(tool.inputSchema.properties).toHaveProperty("body");
+  });
+
+  it("includes requestBody description in body property", () => {
+    const spec: OpenAPISpec = {
+      openapi: "3.0.0",
+      info: { title: "T", version: "1" },
+      paths: {
+        "/users": {
+          post: {
+            operationId: "createUser",
+            requestBody: {
+              description: "User payload",
+              content: {
+                "application/json": { schema: { type: "object" } },
+              },
+            },
+          },
+        },
+      },
+    };
+
+    const tools = buildTools(spec);
+    const tool = tools.find((t) => t.name === "createUser")!;
+    expect(tool.inputSchema.properties["body"]).toMatchObject({ description: "User payload" });
+  });
+});
+
+describe("buildTools — parameter without schema", () => {
+  it("falls back to string type when parameter has no schema", () => {
+    const spec: OpenAPISpec = {
+      openapi: "3.0.0",
+      info: { title: "T", version: "1" },
+      paths: {
+        "/search": {
+          get: {
+            operationId: "search",
+            parameters: [{ name: "q", in: "query" }], // no schema
+          },
+        },
+      },
+    };
+
+    const tools = buildTools(spec);
+    const tool = tools.find((t) => t.name === "search")!;
+    expect(tool.inputSchema.properties["q"]).toEqual({ type: "string" });
+  });
+
+  it("marks query parameter as required when required: true in spec", () => {
+    const spec: OpenAPISpec = {
+      openapi: "3.0.0",
+      info: { title: "T", version: "1" },
+      paths: {
+        "/search": {
+          get: {
+            operationId: "search",
+            parameters: [
+              { name: "q", in: "query", required: true, schema: { type: "string" } },
+            ],
+          },
+        },
+      },
+    };
+
+    const tools = buildTools(spec);
+    const tool = tools.find((t) => t.name === "search")!;
+    expect(tool.inputSchema.required).toContain("q");
+  });
+});
+
+// ─── loadSpec — local file and validation ─────────────────────────────────────
+
+describe("loadSpec — HTTP errors and unknown format", () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it("throws on HTTP error response", async () => {
+    vi.stubGlobal("fetch", vi.fn());
+    vi.mocked(fetch).mockResolvedValue({
+      ok: false,
+      status: 404,
+      statusText: "Not Found",
+    } as Response);
+
+    await expect(loadSpec("https://api.example.com/openapi.json")).rejects.toThrow(
+      "Failed to fetch spec from https://api.example.com/openapi.json: 404 Not Found"
+    );
+  });
+
+  it("loads spec when content-type has no json/yaml hint (falls back to content detection)", async () => {
+    const spec = { openapi: "3.0.0", info: { title: "T", version: "1" }, paths: {} };
+    vi.stubGlobal("fetch", vi.fn());
+    vi.mocked(fetch).mockResolvedValue({
+      ok: true,
+      text: async () => JSON.stringify(spec),
+      headers: { get: () => "text/plain" }, // no json/yaml content-type
+    } as unknown as Response);
+
+    // URL with no .json/.yaml extension → formatHint returns undefined → parseContent guesses from content
+    const loaded = await loadSpec("https://api.example.com/schema");
+    expect(loaded.openapi).toBe("3.0.0");
+  });
+});
+
+describe("loadSpec — local file", () => {
+  it("loads a valid spec from a local JSON file", async () => {
+    const { writeFile, unlink } = await import("node:fs/promises");
+    const { tmpdir } = await import("node:os");
+    const { join } = await import("node:path");
+
+    const spec = {
+      openapi: "3.0.0",
+      info: { title: "Local API", version: "1.0.0" },
+      paths: { "/ping": { get: { operationId: "ping" } } },
+    };
+    const filePath = join(tmpdir(), `test-spec-${Date.now()}.json`);
+    await writeFile(filePath, JSON.stringify(spec), "utf-8");
+
+    try {
+      const loaded = await loadSpec(filePath);
+      expect(loaded.info.title).toBe("Local API");
+      expect(loaded.paths["/ping"]).toBeDefined();
+    } finally {
+      await unlink(filePath);
+    }
+  });
+
+  it("throws for spec missing openapi field", async () => {
+    vi.stubGlobal("fetch", vi.fn());
+    vi.mocked(fetch).mockResolvedValue({
+      ok: true,
+      text: async () => JSON.stringify({ paths: {} }),
+      headers: { get: () => "application/json" },
+    } as unknown as Response);
+
+    await expect(loadSpec("https://api.example.com/openapi.json")).rejects.toThrow(
+      "Invalid OpenAPI spec"
+    );
+    vi.unstubAllGlobals();
+  });
+
+  it("loads a valid spec from a local .yml file", async () => {
+    const { writeFile, unlink } = await import("node:fs/promises");
+    const { tmpdir } = await import("node:os");
+    const { join } = await import("node:path");
+
+    const spec = {
+      openapi: "3.0.0",
+      info: { title: "YML API", version: "1.0.0" },
+      paths: { "/health": { get: { operationId: "health" } } },
+    };
+    const filePath = join(tmpdir(), `test-spec-${Date.now()}.yml`);
+    const yaml = `openapi: "3.0.0"\ninfo:\n  title: "YML API"\n  version: "1.0.0"\npaths:\n  /health:\n    get:\n      operationId: health\n`;
+    await writeFile(filePath, yaml, "utf-8");
+
+    try {
+      const loaded = await loadSpec(filePath);
+      expect(loaded.info.title).toBe("YML API");
+    } finally {
+      await unlink(filePath);
+    }
   });
 });
