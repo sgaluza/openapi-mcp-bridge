@@ -495,6 +495,22 @@ describe("auth", () => {
     expect(headers["Authorization"]).toBe("Bearer my-token");
   });
 
+  it("resolves API2MCP_AUTH_TOKEN as raw Authorization header (no Bearer prefix)", () => {
+    const headers = resolveAuthHeaders(testSpec, {
+      cliHeaders: {},
+      env: { API2MCP_AUTH_TOKEN: "lin_api_xxx" },
+    });
+    expect(headers["Authorization"]).toBe("lin_api_xxx");
+  });
+
+  it("BEARER_TOKEN overrides AUTH_TOKEN when both are set", () => {
+    const headers = resolveAuthHeaders(testSpec, {
+      cliHeaders: {},
+      env: { API2MCP_AUTH_TOKEN: "raw-token", API2MCP_BEARER_TOKEN: "bearer-token" },
+    });
+    expect(headers["Authorization"]).toBe("Bearer bearer-token");
+  });
+
   it("CLI headers override env-based auth", () => {
     const headers = resolveAuthHeaders(testSpec, {
       cliHeaders: { "X-API-Key": "cli-key" },
@@ -518,6 +534,72 @@ describe("auth", () => {
       env: { OPENAPI_API_KEY: "secret" },
     });
     expect(headers["__query:api_key"]).toBe("secret");
+  });
+
+  it("env vars override config.auth.headers (correct priority)", () => {
+    // Simulates the pattern used in rest.ts and graphql.ts:
+    // config.auth.headers is applied first, then resolveAuthHeaders overrides
+    const configAuthHeaders = { Authorization: "config-token" };
+    const authHeaders = {
+      ...configAuthHeaders,
+      ...resolveAuthHeaders(null, {
+        cliHeaders: {},
+        env: { API2MCP_BEARER_TOKEN: "env-bearer" },
+      }),
+    };
+    expect(authHeaders["Authorization"]).toBe("Bearer env-bearer");
+  });
+
+  it("CLI flags override env vars and config.auth.headers", () => {
+    const configAuthHeaders = { Authorization: "config-token" };
+    const authHeaders = {
+      ...configAuthHeaders,
+      ...resolveAuthHeaders(null, {
+        cliHeaders: { Authorization: "cli-token" },
+        env: { API2MCP_BEARER_TOKEN: "env-bearer" },
+      }),
+    };
+    expect(authHeaders["Authorization"]).toBe("cli-token");
+  });
+
+  it("resolveAuthHeaders with null spec falls back to X-API-Key for apiKey", () => {
+    const headers = resolveAuthHeaders(null, {
+      cliHeaders: {},
+      env: { API2MCP_API_KEY: "key123" },
+    });
+    expect(headers["X-API-Key"]).toBe("key123");
+  });
+
+  it("config.auth.bearer overrides config.auth.headers.Authorization (documented behavior)", () => {
+    // When user sets both auth.headers.Authorization and auth.bearer in config,
+    // the bearer token wins because resolveAuthHeaders runs after config.auth.headers.
+    // This test documents the expected behavior to prevent confusion.
+    const configAuthHeaders = { Authorization: "config-header-token" };
+    const mergedEnv = { API2MCP_BEARER_TOKEN: "config-bearer-token" }; // bearer from config becomes env via mergeEnvWithConfig
+    const authHeaders = {
+      ...configAuthHeaders,
+      ...resolveAuthHeaders(null, { cliHeaders: {}, env: mergedEnv }),
+    };
+    expect(authHeaders["Authorization"]).toBe("Bearer config-bearer-token");
+  });
+
+  it("BEARER_TOKEN is not overridden by API_KEY when scheme uses Authorization header", () => {
+    // Edge case: spec declares apiKey scheme with name: Authorization
+    const authorizationKeySpec: OpenAPISpec = {
+      ...testSpec,
+      components: {
+        ...testSpec.components,
+        securitySchemes: {
+          apiAuth: { type: "apiKey", name: "Authorization", in: "header" },
+        },
+      },
+    };
+    const headers = resolveAuthHeaders(authorizationKeySpec, {
+      cliHeaders: {},
+      env: { API2MCP_BEARER_TOKEN: "bearer-tok", API2MCP_API_KEY: "api-key" },
+    });
+    // BEARER_TOKEN (priority 2) must not be overwritten by API_KEY (priority 3)
+    expect(headers["Authorization"]).toBe("Bearer bearer-tok");
   });
 
   it("falls back to X-API-Key when no apiKey-type security scheme exists", () => {

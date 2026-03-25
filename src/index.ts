@@ -33,6 +33,7 @@ program.action(() => {
 });
 
 program.parseAsync(process.argv).catch((error) => {
-  process.stderr.write(chalk.red("✗ Fatal error: ") + (error.message || error) + "\n");
+  /* v8 ignore next */
+  process.stderr.write(chalk.red("✗ Fatal error: ") + (error instanceof Error ? error.message : String(error)) + "\n");
   process.exit(1);
 });

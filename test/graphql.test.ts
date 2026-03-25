@@ -668,8 +668,9 @@ describe("buildSelectionSet — UNION type", () => {
 });
 
 describe("buildSelectionSet — object with no selectable fields", () => {
-  it("falls back to field name when nested object has no scalar fields", () => {
-    // EmptyNested has only a nested object field with no scalars
+  it("skips nested object field when it has no scalar fields within depth limit", () => {
+    // Wrapper.inner → EmptyObj which has only a depth-2 object field (no scalars at depth 1).
+    // The field should be skipped entirely to avoid an invalid query (field without sub-selection).
     const types: IntrospectionType[] = [
       ...BUILTIN_SCALAR_TYPES,
       {
@@ -697,10 +698,8 @@ describe("buildSelectionSet — object with no selectable fields", () => {
     ];
     const typeMap = new Map(types.filter((t) => t.name).map((t) => [t.name!, t]));
     const result = buildSelectionSet(objectRef("Wrapper"), typeMap);
-    // inner should be included since EmptyObj at depth 1 recurse into depth 2
-    // but EmptyObj itself has no scalars at depth 1, so sub is empty at depth 1
-    // → falls back to just "inner"
-    expect(result).toContain("inner");
+    // EmptyObj has no leaf fields at depth 1 → sub is empty → field is skipped entirely
+    expect(result).toBe("");
   });
 });
 
@@ -1290,5 +1289,39 @@ describe("buildSelectionSet — defensive edge cases", () => {
       typeMap
     );
     expect(result).toContain("anon");
+  });
+});
+
+// ─── graphqlTypeToJsonSchema — nested INPUT_OBJECT depth limit ─────────────────
+
+describe("graphqlTypeToJsonSchema — nested INPUT_OBJECT capped at depth 1", () => {
+  it("returns plain object schema for INPUT_OBJECT nested inside another INPUT_OBJECT", () => {
+    const types: IntrospectionType[] = [
+      {
+        kind: "INPUT_OBJECT",
+        name: "OuterInput",
+        inputFields: [
+          { name: "inner", description: null, type: inputRef("InnerInput"), defaultValue: null },
+          { name: "name", description: null, type: scalar("String"), defaultValue: null },
+        ],
+      },
+      {
+        kind: "INPUT_OBJECT",
+        name: "InnerInput",
+        inputFields: [
+          { name: "value", description: null, type: scalar("String"), defaultValue: null },
+        ],
+      },
+    ];
+    const typeMap = new Map(types.map((t) => [t.name!, t]));
+    const result = graphqlTypeToJsonSchema(inputRef("OuterInput"), typeMap) as Record<string, unknown>;
+    // OuterInput.name → string (expanded)
+    expect((result.properties as Record<string, unknown>)["name"]).toEqual({ type: "string" });
+    // OuterInput.inner → InnerInput at depth 1 → capped, returned as plain object with field names
+    const inner = (result.properties as Record<string, unknown>)["inner"] as Record<string, unknown>;
+    expect(inner.type).toBe("object");
+    expect(inner.description).toContain("InnerInput");
+    expect(inner.description).toContain("value"); // field names listed in description
+    expect(inner).not.toHaveProperty("properties");
   });
 });

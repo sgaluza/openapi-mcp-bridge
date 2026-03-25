@@ -5,26 +5,26 @@ import { buildGraphQLTools } from "../graphql-tool-builder.js";
 import type { GraphQLToolDefinition } from "../graphql-tool-builder.js";
 import { executeGraphQLCall } from "../graphql-executor.js";
 import { filterTools, applyBindings } from "../tool-builder.js";
-import { parseHeaderFlags } from "../auth.js";
+import { parseHeaderFlags, resolveAuthHeaders } from "../auth.js";
 import { startMcpServer } from "../mcp-server.js";
 import { resolveFilterOptions } from "./filter-options.js";
 import { parseBindings } from "./bind-options.js";
+import { loadConfigFile, mergeEnvWithConfig } from "../config-file.js";
 
 const collect = (val: string, acc: string[]) => [...acc, val];
 
-/**
- * Register the `graphql` subcommand onto the given commander program.
- */
+/** Register the `graphql` subcommand onto the given commander program. */
 export function registerGraphqlCommand(program: Command): void {
   program
     .command("graphql")
     .description("Start an MCP server from a GraphQL schema")
-    .argument("<endpoint>", "GraphQL endpoint URL or SDL file path")
+    .argument("[endpoint]", "GraphQL endpoint URL or SDL file path")
     .option("-H, --header <header>", "Add a request header (repeatable)", collect, [])
     .option("--readonly", "Expose only Query operations (no Mutations)")
     .option("--only <operations>", "Whitelist operations by name, comma-separated")
     .option("--exclude <operations>", "Blacklist operations by name, comma-separated")
     .option("--bind <binding>", "Pre-bind a parameter to a fixed value: key=value (repeatable)", collect, [])
+    .option("--config <path>", "Path to config file (default: auto-discover api-to-mcp.yml/yaml/json)")
     .addHelpText("after", `
 Environment variables:
   API2MCP_SPEC_URL      GraphQL endpoint URL (alternative to positional arg)
@@ -43,11 +43,14 @@ Examples:
       only?: string;
       exclude?: string;
       bind: string[];
+      config?: string;
     }) => {
+      const configFile = loadConfigFile(opts.config);
       const endpoint =
         endpointArg ||
         process.env.API2MCP_SPEC_URL ||
-        process.env.OPENAPI_SPEC_URL;
+        process.env.OPENAPI_SPEC_URL ||
+        configFile?.spec;
 
       if (!endpoint) {
         process.stderr.write(
@@ -58,19 +61,18 @@ Examples:
         process.exit(1);
       }
 
-      const readonly = opts.readonly ?? false;
-      const bindings = parseBindings(opts.bind);
+      const readonly = opts.readonly ?? configFile?.options?.readonly ?? false;
+      const bindings = { ...(configFile?.options?.bind ?? {}), ...parseBindings(opts.bind) };
 
-      // Build auth headers from env vars and --header flags
-      const authHeaders: Record<string, string> = {};
-      const bearerToken =
-        process.env.API2MCP_BEARER_TOKEN ?? process.env.OPENAPI_BEARER_TOKEN;
-      if (bearerToken) authHeaders["Authorization"] = `Bearer ${bearerToken}`;
-      const apiKey =
-        process.env.API2MCP_API_KEY ?? process.env.OPENAPI_API_KEY;
-      if (apiKey) authHeaders["X-API-Key"] = apiKey;
-      // CLI --header flags override env vars
-      Object.assign(authHeaders, parseHeaderFlags(opts.header));
+      // Build auth headers: config.auth.headers (lowest) < env vars < CLI flags (highest)
+      const mergedEnv = mergeEnvWithConfig(process.env, configFile?.auth);
+      const authHeaders = {
+        ...(configFile?.auth?.headers ?? {}),
+        ...resolveAuthHeaders(null, {
+          cliHeaders: parseHeaderFlags(opts.header),
+          env: mergedEnv,
+        }),
+      };
 
       const schema = await loadGraphQLSchema(endpoint, authHeaders);
       const allTools = buildGraphQLTools(schema, { readonly });
@@ -90,8 +92,12 @@ Examples:
       }
 
       const bound = applyBindings(allTools, bindings);
-      const { only, exclude } = resolveFilterOptions(opts, bound);
-      // readonly is already applied in buildGraphQLTools — pass false here
+      const mergedOpts = {
+        only: opts.only ?? configFile?.options?.only?.join(","),
+        exclude: opts.exclude ?? configFile?.options?.exclude?.join(","),
+      };
+      const { only, exclude } = resolveFilterOptions(mergedOpts, bound);
+      // readonly is already applied in buildGraphQLTools - pass false here
       const tools = filterTools(bound, { only, exclude });
 
       if (tools.length === 0) {

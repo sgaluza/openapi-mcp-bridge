@@ -11,31 +11,42 @@ export interface AuthConfig {
  * Resolve authentication headers from CLI flags, environment variables,
  * and the OpenAPI spec's securitySchemes.
  *
- * Priority:
- * 1. Explicit --header flags (highest priority)
+ * Priority (highest wins):
+ * 1. Explicit --header flags
  * 2. API2MCP_BEARER_TOKEN env → Authorization: Bearer {token}
- * 3. API2MCP_API_KEY env → uses securitySchemes to determine header name and location
+ * 3. API2MCP_AUTH_TOKEN env → Authorization: {raw value, no prefix}
+ * 4. API2MCP_API_KEY env → uses securitySchemes to determine header name and location
  *
  * Legacy OPENAPI_* variables are supported as aliases for backwards compatibility.
  */
 export function resolveAuthHeaders(
-  spec: OpenAPISpec,
+  spec: OpenAPISpec | null,
   config: AuthConfig
 ): Record<string, string> {
   const headers: Record<string, string> = {};
 
-  // 1. API2MCP_BEARER_TOKEN from env (OPENAPI_BEARER_TOKEN as legacy alias)
+  // 1. API2MCP_AUTH_TOKEN — raw Authorization header value (e.g. Linear API keys)
+  const authToken = config.env.API2MCP_AUTH_TOKEN;
+  if (authToken) {
+    headers["Authorization"] = authToken;
+  }
+
+  // 2. API2MCP_BEARER_TOKEN from env — overrides AUTH_TOKEN (OPENAPI_BEARER_TOKEN as legacy alias)
   const bearerToken = config.env.API2MCP_BEARER_TOKEN ?? config.env.OPENAPI_BEARER_TOKEN;
   if (bearerToken) {
     headers["Authorization"] = `Bearer ${bearerToken}`;
   }
 
-  // 2. API2MCP_API_KEY from env — find matching securityScheme (OPENAPI_API_KEY as legacy alias)
+  // 3. API2MCP_API_KEY from env — find matching securityScheme (OPENAPI_API_KEY as legacy alias)
   const apiKey = config.env.API2MCP_API_KEY ?? config.env.OPENAPI_API_KEY;
-  if (apiKey && spec.components?.securitySchemes) {
-    const scheme = findApiKeyScheme(spec.components.securitySchemes);
+  if (apiKey) {
+    const schemes = spec?.components?.securitySchemes;
+    const scheme = schemes ? findApiKeyScheme(schemes) : undefined;
     if (scheme && scheme.in === "header" && scheme.name) {
-      headers[scheme.name] = apiKey;
+      // Don't override Authorization already set by higher-priority BEARER_TOKEN or AUTH_TOKEN
+      if (scheme.name !== "Authorization" || !headers["Authorization"]) {
+        headers[scheme.name] = apiKey;
+      }
     } else if (scheme && scheme.in === "query") {
       // Query params handled at request time, not as headers.
       // Store as a special marker for the executor.
@@ -46,7 +57,7 @@ export function resolveAuthHeaders(
     }
   }
 
-  // 3. CLI headers override everything
+  // 4. CLI headers override everything
   Object.assign(headers, config.cliHeaders);
 
   return headers;

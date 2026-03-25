@@ -7,12 +7,11 @@ import { resolveAuthHeaders, parseHeaderFlags } from "../auth.js";
 import { startMcpServer } from "../mcp-server.js";
 import { resolveFilterOptions } from "./filter-options.js";
 import { parseBindings } from "./bind-options.js";
+import { loadConfigFile, mergeEnvWithConfig } from "../config-file.js";
 
 const collect = (val: string, acc: string[]) => [...acc, val];
 
-/**
- * Register the `rest` subcommand onto the given commander program.
- */
+/** Register the `rest` subcommand onto the given commander program. */
 export function registerRestCommand(program: Command): void {
   program
     .command("rest")
@@ -23,6 +22,7 @@ export function registerRestCommand(program: Command): void {
     .option("--only <operations>", "Whitelist operations by name, comma-separated")
     .option("--exclude <operations>", "Blacklist operations by name, comma-separated")
     .option("--bind <binding>", "Pre-bind a parameter to a fixed value: key=value (repeatable)", collect, [])
+    .option("--config <path>", "Path to config file (default: auto-discover api-to-mcp.yml/yaml/json)")
     .addHelpText("after", `
 Environment variables:
   API2MCP_SPEC_URL      OpenAPI spec URL or path (alternative to positional arg)
@@ -39,16 +39,17 @@ Examples:
   $ api-to-mcp rest spec.yaml --exclude "deleteIssue,archiveProject"
   $ api-to-mcp rest spec.yaml --bind "teamId=TEAM_ABC" --bind "projectId=PROJ_XYZ"
   $ API2MCP_SPEC_URL=https://api.example.com/openapi.yaml api-to-mcp rest`)
-    .action(async (specArg: string | undefined, opts: { header: string[]; readonly?: boolean; only?: string; exclude?: string; bind: string[] }) => {
-      const specSource = specArg || process.env.API2MCP_SPEC_URL || process.env.OPENAPI_SPEC_URL;
+    .action(async (specArg: string | undefined, opts: { header: string[]; readonly?: boolean; only?: string; exclude?: string; bind: string[]; config?: string }) => {
+      const configFile = loadConfigFile(opts.config);
+      const specSource = specArg || process.env.API2MCP_SPEC_URL || process.env.OPENAPI_SPEC_URL || configFile?.spec;
 
       if (!specSource) {
         process.stderr.write(chalk.red("Error: no spec source provided. Pass as argument or set API2MCP_SPEC_URL.\n"));
         process.exit(1);
       }
 
-      const readonly = opts.readonly ?? false;
-      const bindings = parseBindings(opts.bind);
+      const readonly = opts.readonly ?? configFile?.options?.readonly ?? false;
+      const bindings = { ...(configFile?.options?.bind ?? {}), ...parseBindings(opts.bind) };
 
       const spec = await loadSpec(specSource);
       const serverName = spec.info.title || "api-to-mcp";
@@ -56,7 +57,7 @@ Examples:
 
       const allTools = buildTools(spec);
 
-      // Warn if any binding key doesn't match a parameter in any tool
+      // Warn if any binding key does not match a parameter in any tool
       const allParamNames = new Set(allTools.flatMap((t) => Object.keys(t.inputSchema.properties)));
       for (const key of Object.keys(bindings)) {
         if (!allParamNames.has(key)) {
@@ -65,7 +66,11 @@ Examples:
       }
 
       const bound = applyBindings(allTools, bindings);
-      const { only, exclude } = resolveFilterOptions(opts, bound);
+      const mergedOpts = {
+        only: opts.only ?? configFile?.options?.only?.join(","),
+        exclude: opts.exclude ?? configFile?.options?.exclude?.join(","),
+      };
+      const { only, exclude } = resolveFilterOptions(mergedOpts, bound);
       const tools = filterTools(bound, { readonly, only, exclude });
 
       if (tools.length === 0) {
@@ -83,10 +88,14 @@ Examples:
       }
 
       const baseUrl = resolveBaseUrl(spec.servers?.[0]?.url, specSource);
-      const authHeaders = resolveAuthHeaders(spec, {
-        cliHeaders: parseHeaderFlags(opts.header),
-        env: process.env,
-      });
+      const mergedEnv = mergeEnvWithConfig(process.env, configFile?.auth);
+      const authHeaders = {
+        ...(configFile?.auth?.headers ?? {}),
+        ...resolveAuthHeaders(spec, {
+          cliHeaders: parseHeaderFlags(opts.header),
+          env: mergedEnv,
+        }),
+      };
 
       await startMcpServer({
         serverName,
