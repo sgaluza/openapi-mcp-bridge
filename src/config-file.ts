@@ -46,10 +46,25 @@ function parseConfigFile(path: string): ConfigFile {
     for (const key of Object.keys(parsed.auth)) {
       if (!KNOWN_AUTH_KEYS.has(key)) process.stderr.write(`Warning: unknown auth key '${key}' in ${path}\n`);
     }
+    if (parsed.auth.headers !== undefined && (typeof parsed.auth.headers !== "object" || Array.isArray(parsed.auth.headers))) {
+      process.stderr.write(`Warning: auth.headers must be an object in ${path}\n`);
+    }
   }
   if (parsed.options && typeof parsed.options === "object") {
     for (const key of Object.keys(parsed.options)) {
       if (!KNOWN_OPTIONS_KEYS.has(key)) process.stderr.write(`Warning: unknown options key '${key}' in ${path}\n`);
+    }
+    if (parsed.options.readonly !== undefined && typeof parsed.options.readonly !== "boolean") {
+      process.stderr.write(`Warning: options.readonly must be a boolean in ${path}\n`);
+    }
+    if (parsed.options.only !== undefined && !Array.isArray(parsed.options.only)) {
+      process.stderr.write(`Warning: options.only must be an array in ${path}\n`);
+    }
+    if (parsed.options.exclude !== undefined && !Array.isArray(parsed.options.exclude)) {
+      process.stderr.write(`Warning: options.exclude must be an array in ${path}\n`);
+    }
+    if (parsed.options.bind !== undefined && (typeof parsed.options.bind !== "object" || Array.isArray(parsed.options.bind))) {
+      process.stderr.write(`Warning: options.bind must be an object in ${path}\n`);
     }
   }
   return parsed;

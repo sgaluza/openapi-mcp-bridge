@@ -160,6 +160,57 @@ auth:
     expect(stderrWrites.some((w) => w.includes("unknown options key 'onli'"))).toBe(true);
   });
 
+  it("warns when options.only is a string instead of array", () => {
+    const filePath = join(tmpDir, "bad-only.yml");
+    writeFileSync(filePath, "options:\n  only: getUser\n");
+    const stderrWrites: string[] = [];
+    const orig = process.stderr.write.bind(process.stderr);
+    process.stderr.write = (chunk: unknown) => { stderrWrites.push(String(chunk)); return true; };
+    try { loadConfigFile(filePath); } finally { process.stderr.write = orig; }
+    expect(stderrWrites.some((w) => w.includes("options.only must be an array"))).toBe(true);
+  });
+
+  it("warns when options.exclude is a string instead of array", () => {
+    const filePath = join(tmpDir, "bad-exclude.yml");
+    writeFileSync(filePath, "options:\n  exclude: deleteUser\n");
+    const stderrWrites: string[] = [];
+    const orig = process.stderr.write.bind(process.stderr);
+    process.stderr.write = (chunk: unknown) => { stderrWrites.push(String(chunk)); return true; };
+    try { loadConfigFile(filePath); } finally { process.stderr.write = orig; }
+    expect(stderrWrites.some((w) => w.includes("options.exclude must be an array"))).toBe(true);
+  });
+
+  it("warns when options.bind is an array instead of object", () => {
+    const filePath = join(tmpDir, "bad-bind.yml");
+    writeFileSync(filePath, "options:\n  bind:\n    - key=val\n");
+    const stderrWrites: string[] = [];
+    const orig = process.stderr.write.bind(process.stderr);
+    process.stderr.write = (chunk: unknown) => { stderrWrites.push(String(chunk)); return true; };
+    try { loadConfigFile(filePath); } finally { process.stderr.write = orig; }
+    expect(stderrWrites.some((w) => w.includes("options.bind must be an object"))).toBe(true);
+  });
+
+  it("warns when options.readonly is a string instead of boolean", () => {
+    const filePath = join(tmpDir, "bad-readonly.yml");
+    // YAML parses 'yes' as boolean true — use quoted "yes" to keep it as string
+    writeFileSync(filePath, 'options:\n  readonly: "yes"\n');
+    const stderrWrites: string[] = [];
+    const orig = process.stderr.write.bind(process.stderr);
+    process.stderr.write = (chunk: unknown) => { stderrWrites.push(String(chunk)); return true; };
+    try { loadConfigFile(filePath); } finally { process.stderr.write = orig; }
+    expect(stderrWrites.some((w) => w.includes("options.readonly must be a boolean"))).toBe(true);
+  });
+
+  it("warns when auth.headers is a string instead of object", () => {
+    const filePath = join(tmpDir, "bad-headers.yml");
+    writeFileSync(filePath, "auth:\n  headers: X-Key:value\n");
+    const stderrWrites: string[] = [];
+    const orig = process.stderr.write.bind(process.stderr);
+    process.stderr.write = (chunk: unknown) => { stderrWrites.push(String(chunk)); return true; };
+    try { loadConfigFile(filePath); } finally { process.stderr.write = orig; }
+    expect(stderrWrites.some((w) => w.includes("auth.headers must be an object"))).toBe(true);
+  });
+
   it("prefers api-to-mcp.yml over api-to-mcp.yaml and api-to-mcp.json when multiple exist", () => {
     writeFileSync(join(tmpDir, "api-to-mcp.yml"), "spec: from-yml\n");
     writeFileSync(join(tmpDir, "api-to-mcp.yaml"), "spec: from-yaml\n");
