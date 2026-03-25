@@ -1,0 +1,140 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 480 360" fill="none">
+  <defs>
+    <linearGradient id="bgGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#1a1a2e;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#16213e;stop-opacity:1" />
+    </linearGradient>
+    <linearGradient id="brandGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" style="stop-color:#6366f1;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#8b5cf6;stop-opacity:1" />
+    </linearGradient>
+    <linearGradient id="greenGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" style="stop-color:#10b981;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#059669;stop-opacity:1" />
+    </linearGradient>
+    <filter id="glow">
+      <feGaussianBlur stdDeviation="3" result="coloredBlur"/>
+      <feMerge>
+        <feMergeNode in="coloredBlur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+    <filter id="softGlow">
+      <feGaussianBlur stdDeviation="8" result="coloredBlur"/>
+      <feMerge>
+        <feMergeNode in="coloredBlur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+  </defs>
+
+  <!-- Background -->
+  <rect width="480" height="360" fill="url(#bgGrad)" rx="16"/>
+
+  <!-- Subtle grid -->
+  <g opacity="0.06" stroke="#6366f1" stroke-width="0.5">
+    <line x1="0" y1="60" x2="480" y2="60"/>
+    <line x1="0" y1="120" x2="480" y2="120"/>
+    <line x1="0" y1="180" x2="480" y2="180"/>
+    <line x1="0" y1="240" x2="480" y2="240"/>
+    <line x1="0" y1="300" x2="480" y2="300"/>
+    <line x1="80" y1="0" x2="80" y2="360"/>
+    <line x1="160" y1="0" x2="160" y2="360"/>
+    <line x1="240" y1="0" x2="240" y2="360"/>
+    <line x1="320" y1="0" x2="320" y2="360"/>
+    <line x1="400" y1="0" x2="400" y2="360"/>
+  </g>
+
+  <!-- ── LEFT BLOCK: API Spec ── -->
+  <rect x="24" y="60" width="140" height="240" rx="12" fill="#0f172a" stroke="#334155" stroke-width="1.5"/>
+
+  <!-- Header bar -->
+  <rect x="24" y="60" width="140" height="36" rx="12" fill="#1e293b"/>
+  <rect x="24" y="84" width="140" height="12" fill="#1e293b"/>
+  <!-- dots -->
+  <circle cx="44" cy="78" r="5" fill="#ef4444" opacity="0.8"/>
+  <circle cx="60" cy="78" r="5" fill="#f59e0b" opacity="0.8"/>
+  <circle cx="76" cy="78" r="5" fill="#10b981" opacity="0.8"/>
+  <!-- label -->
+  <text x="94" y="83" font-family="monospace" font-size="10" fill="#64748b">openapi.yaml</text>
+
+  <!-- YAML lines -->
+  <text x="36" y="116" font-family="monospace" font-size="9" fill="#6366f1">paths:</text>
+  <text x="44" y="132" font-family="monospace" font-size="9" fill="#94a3b8">/users:</text>
+  <text x="52" y="148" font-family="monospace" font-size="9" fill="#10b981">get:</text>
+  <text x="60" y="162" font-family="monospace" font-size="9" fill="#64748b">operationId:</text>
+  <text x="60" y="176" font-family="monospace" font-size="9" fill="#e2e8f0">  listUsers</text>
+  <text x="52" y="192" font-family="monospace" font-size="9" fill="#f59e0b">post:</text>
+  <text x="60" y="206" font-family="monospace" font-size="9" fill="#64748b">operationId:</text>
+  <text x="60" y="220" font-family="monospace" font-size="9" fill="#e2e8f0">  createUser</text>
+  <text x="44" y="238" font-family="monospace" font-size="9" fill="#94a3b8">/issues:</text>
+  <text x="52" y="254" font-family="monospace" font-size="9" fill="#10b981">get:</text>
+  <text x="60" y="268" font-family="monospace" font-size="9" fill="#e2e8f0">  listIssues</text>
+
+  <!-- ── CENTER: Bridge ── -->
+  <!-- Glow circle behind bridge -->
+  <circle cx="240" cy="180" r="52" fill="#6366f1" opacity="0.08" filter="url(#softGlow)"/>
+  <circle cx="240" cy="180" r="40" fill="#0f172a" stroke="#6366f1" stroke-width="2"/>
+
+  <!-- Arrow in center -->
+  <text x="240" y="187" font-family="monospace" font-size="22" fill="url(#brandGrad)" text-anchor="middle" filter="url(#glow)">⇄</text>
+
+  <!-- Bridge label -->
+  <rect x="196" y="232" width="88" height="22" rx="6" fill="#1e293b" stroke="#334155" stroke-width="1"/>
+  <text x="240" y="247" font-family="sans-serif" font-size="9" fill="#94a3b8" text-anchor="middle" font-weight="600">api-to-mcp</text>
+
+  <!-- Connecting lines left -->
+  <line x1="164" y1="180" x2="198" y2="180" stroke="#6366f1" stroke-width="1.5" stroke-dasharray="4,3" opacity="0.6"/>
+  <polygon points="198,176 206,180 198,184" fill="#6366f1" opacity="0.8"/>
+
+  <!-- Connecting lines right -->
+  <line x1="282" y1="180" x2="316" y2="180" stroke="#10b981" stroke-width="1.5" stroke-dasharray="4,3" opacity="0.6"/>
+  <polygon points="316,176 324,180 316,184" fill="#10b981" opacity="0.8"/>
+
+  <!-- ── RIGHT BLOCK: MCP Tools ── -->
+  <rect x="316" y="60" width="140" height="240" rx="12" fill="#0f172a" stroke="#334155" stroke-width="1.5"/>
+
+  <!-- Header -->
+  <rect x="316" y="60" width="140" height="36" rx="12" fill="#1e293b"/>
+  <rect x="316" y="84" width="140" height="12" fill="#1e293b"/>
+  <circle cx="336" cy="78" r="5" fill="#ef4444" opacity="0.8"/>
+  <circle cx="352" cy="78" r="5" fill="#f59e0b" opacity="0.8"/>
+  <circle cx="368" cy="78" r="5" fill="#10b981" opacity="0.8"/>
+  <text x="380" y="83" font-family="monospace" font-size="10" fill="#64748b">MCP tools</text>
+
+  <!-- Tool items -->
+  <g>
+    <rect x="332" y="104" width="108" height="24" rx="6" fill="#1a2744" stroke="#3b4f7c" stroke-width="1"/>
+    <circle cx="346" cy="116" r="5" fill="#10b981" opacity="0.9"/>
+    <text x="358" y="120" font-family="monospace" font-size="9" fill="#e2e8f0">listUsers</text>
+  </g>
+  <g>
+    <rect x="332" y="136" width="108" height="24" rx="6" fill="#1a2744" stroke="#3b4f7c" stroke-width="1"/>
+    <circle cx="346" cy="148" r="5" fill="#f59e0b" opacity="0.9"/>
+    <text x="358" y="152" font-family="monospace" font-size="9" fill="#e2e8f0">createUser</text>
+  </g>
+  <g>
+    <rect x="332" y="168" width="108" height="24" rx="6" fill="#1a2744" stroke="#3b4f7c" stroke-width="1"/>
+    <circle cx="346" cy="180" r="5" fill="#10b981" opacity="0.9"/>
+    <text x="358" y="184" font-family="monospace" font-size="9" fill="#e2e8f0">listIssues</text>
+  </g>
+  <g>
+    <rect x="332" y="200" width="108" height="24" rx="6" fill="#1a2744" stroke="#3b4f7c" stroke-width="1"/>
+    <circle cx="346" cy="212" r="5" fill="#f59e0b" opacity="0.9"/>
+    <text x="358" y="216" font-family="monospace" font-size="9" fill="#e2e8f0">createIssue</text>
+  </g>
+  <g>
+    <rect x="332" y="232" width="108" height="24" rx="6" fill="#1a2744" stroke="#3b4f7c" stroke-width="1"/>
+    <circle cx="346" cy="244" r="5" fill="#6366f1" opacity="0.9"/>
+    <text x="358" y="248" font-family="monospace" font-size="9" fill="#e2e8f0">getProject</text>
+  </g>
+  <g>
+    <rect x="332" y="264" width="108" height="24" rx="6" fill="#111827" stroke="#1e293b" stroke-width="1"/>
+    <text x="386" y="280" font-family="monospace" font-size="9" fill="#334155" text-anchor="middle">+ more…</text>
+  </g>
+
+  <!-- Bottom label -->
+  <text x="240" y="332" font-family="sans-serif" font-size="10" fill="#475569" text-anchor="middle">
+    OpenAPI · GraphQL → Claude · Cursor · any MCP client
+  </text>
+</svg>
