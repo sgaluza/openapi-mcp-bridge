@@ -6,7 +6,8 @@ hero:
   text: "Any API → MCP server"
   tagline: Connect OpenAPI and GraphQL APIs to Claude, Cursor, or any MCP client — one command, no code.
   image:
-    src: /hero.svg
+    dark: /hero-dark.svg
+    light: /hero-light.svg
     alt: api-to-mcp
   actions:
     - theme: brand

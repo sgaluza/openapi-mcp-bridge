@@ -1,0 +1,24 @@
+/* ── Hero image: remove VitePress size constraints ── */
+.VPHero .image-container {
+  max-width: 520px !important;
+  width: 100%;
+}
+
+.VPHero .image-bg {
+  display: none;
+}
+
+.VPHero .image-src {
+  max-width: 520px !important;
+  width: 100% !important;
+  height: auto !important;
+}
+
+@media (min-width: 960px) {
+  .VPHero .image-container {
+    max-width: 560px !important;
+  }
+  .VPHero .image-src {
+    max-width: 560px !important;
+  }
+}
