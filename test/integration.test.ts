@@ -570,6 +570,19 @@ describe("auth", () => {
     expect(headers["X-API-Key"]).toBe("key123");
   });
 
+  it("config.auth.bearer overrides config.auth.headers.Authorization (documented behavior)", () => {
+    // When user sets both auth.headers.Authorization and auth.bearer in config,
+    // the bearer token wins because resolveAuthHeaders runs after config.auth.headers.
+    // This test documents the expected behavior to prevent confusion.
+    const configAuthHeaders = { Authorization: "config-header-token" };
+    const mergedEnv = { API2MCP_BEARER_TOKEN: "config-bearer-token" }; // bearer from config becomes env via mergeEnvWithConfig
+    const authHeaders = {
+      ...configAuthHeaders,
+      ...resolveAuthHeaders(null, { cliHeaders: {}, env: mergedEnv }),
+    };
+    expect(authHeaders["Authorization"]).toBe("Bearer config-bearer-token");
+  });
+
   it("falls back to X-API-Key when no apiKey-type security scheme exists", () => {
     const bearerOnlySpec: OpenAPISpec = {
       ...testSpec,

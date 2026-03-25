@@ -118,7 +118,10 @@ export function graphqlTypeToJsonSchema(
     if (visited.has(name)) return { type: "object" }; // Circular reference guard
     // Stop expanding nested INPUT_OBJECTs beyond depth 1 to avoid memory explosion
     // on schemas with deeply nested filter types (e.g. Linear has 6+ levels of filters).
-    if (inputDepth >= 1) return { type: "object", description: `${name} input object` };
+    if (inputDepth >= 1) {
+      const fields = type.inputFields?.map((f) => f.name).join(", ");
+      return { type: "object", description: fields ? `${name} (fields: ${fields})` : `${name} input object` };
+    }
 
     visited = new Set(visited);
     visited.add(name);

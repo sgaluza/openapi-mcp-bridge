@@ -1317,10 +1317,11 @@ describe("graphqlTypeToJsonSchema — nested INPUT_OBJECT capped at depth 1", ()
     const result = graphqlTypeToJsonSchema(inputRef("OuterInput"), typeMap) as Record<string, unknown>;
     // OuterInput.name → string (expanded)
     expect((result.properties as Record<string, unknown>)["name"]).toEqual({ type: "string" });
-    // OuterInput.inner → InnerInput at depth 1 → capped, returned as plain object
+    // OuterInput.inner → InnerInput at depth 1 → capped, returned as plain object with field names
     const inner = (result.properties as Record<string, unknown>)["inner"] as Record<string, unknown>;
     expect(inner.type).toBe("object");
     expect(inner.description).toContain("InnerInput");
+    expect(inner.description).toContain("value"); // field names listed in description
     expect(inner).not.toHaveProperty("properties");
   });
 });
