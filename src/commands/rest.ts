@@ -8,7 +8,7 @@ import { startMcpServer } from "../mcp-server.js";
 import { resolveFilterOptions } from "./filter-options.js";
 import { parseBindings } from "./bind-options.js";
 import { loadConfigFile, mergeEnvWithConfig } from "../config-file.js";
-import { SHARED_OPTIONS, SPEC_OPTION, resolveOption, registerOptions } from "../options-schema.js";
+import { SPEC_OPTION, resolveOption, registerOptions, findSharedOption } from "../options-schema.js";
 
 const collect = (val: string, acc: string[]) => [...acc, val];
 
@@ -41,15 +41,14 @@ Examples:
 
   cmd.action(async (specArg: string | undefined, opts: { header: string[]; readonly?: boolean; only?: string; exclude?: string; bind: string[]; config?: string }) => {
       const configFile = loadConfigFile(opts.config);
-      const findDef = (key: string) => SHARED_OPTIONS.find((d) => d.key === key)!;
-      const specSource = resolveOption(SPEC_OPTION, specArg, process.env, configFile) as string | undefined;
+      const specSource = resolveOption(SPEC_OPTION, specArg, process.env, configFile);
 
       if (!specSource) {
         process.stderr.write(chalk.red("Error: no spec source provided. Pass as argument or set API2MCP_SPEC_URL.\n"));
         process.exit(1);
       }
 
-      const readonly = resolveOption(findDef("readonly"), opts.readonly, process.env, configFile) as boolean;
+      const readonly = resolveOption(findSharedOption("readonly"), opts.readonly, process.env, configFile) ?? false;
       const bindings = { ...(configFile?.options?.bind ?? {}), ...parseBindings(opts.bind) };
 
       const spec = await loadSpec(specSource);
@@ -68,8 +67,8 @@ Examples:
 
       const bound = applyBindings(allTools, bindings);
       const mergedOpts = {
-        only: resolveOption(findDef("only"), opts.only, process.env, configFile) as string | undefined,
-        exclude: resolveOption(findDef("exclude"), opts.exclude, process.env, configFile) as string | undefined,
+        only: resolveOption(findSharedOption("only"), opts.only, process.env, configFile),
+        exclude: resolveOption(findSharedOption("exclude"), opts.exclude, process.env, configFile),
       };
       const { only, exclude } = resolveFilterOptions(mergedOpts, bound);
       const tools = filterTools(bound, { readonly, only, exclude });
@@ -77,8 +76,8 @@ Examples:
       if (tools.length === 0) {
         const applied = [
           readonly && "readonly",
-          opts.only && `only=${opts.only}`,
-          opts.exclude && `exclude=${opts.exclude}`,
+          mergedOpts.only && `only=${mergedOpts.only}`,
+          mergedOpts.exclude && `exclude=${mergedOpts.exclude}`,
           Object.keys(bindings).length > 0 && `bind=[${Object.keys(bindings).join(", ")}]`,
         ].filter(Boolean).join(", ");
         process.stderr.write(chalk.red(

@@ -78,44 +78,64 @@ function getPath(obj: unknown, path: string): unknown {
   }, obj);
 }
 
+/** Maps OptionType to its resolved TypeScript type */
+type InferOptionValue<T extends OptionType> =
+  T extends "boolean" ? boolean :
+  T extends "string" ? string :
+  string; // "array" resolves to comma-separated string
+
 /** Coerce a string env var value to the target option type */
 function coerceEnv(value: string, type: OptionType): unknown {
-  if (type === "boolean") return value === "true" || value === "1";
+  if (type === "boolean") {
+    const lower = value.toLowerCase();
+    return lower === "true" || lower === "1" || lower === "yes";
+  }
   return value; // string and array both return raw string (array = comma-separated)
+}
+
+/**
+ * Find a shared option definition by key. Throws if the key is not found
+ * (guards against typos at call sites).
+ */
+export function findSharedOption(key: string): OptionDef {
+  const def = SHARED_OPTIONS.find((d) => d.key === key);
+  if (!def) throw new Error(`Internal: shared option '${key}' not found in SHARED_OPTIONS`);
+  return def;
 }
 
 /**
  * Resolve an option value using priority: CLI > env vars > config file > default.
  *
  * For "array" type, config string[] is joined with "," to match CLI/env format.
+ * Boolean env vars accept "true"/"1"/"yes" (case-insensitive).
  */
-export function resolveOption(
-  def: OptionDef,
+export function resolveOption<D extends OptionDef>(
+  def: D,
   cliValue: unknown,
   env: Record<string, string | undefined>,
   config: ConfigFile | null
-): unknown {
+): InferOptionValue<D["type"]> | undefined {
   // 1. CLI (highest priority)
-  if (cliValue !== undefined) return cliValue;
+  if (cliValue !== undefined) return cliValue as InferOptionValue<D["type"]>;
 
   // 2. Env vars
   const envNames = Array.isArray(def.env) ? def.env : def.env ? [def.env] : [];
   for (const name of envNames) {
     const val = env[name];
-    if (val !== undefined) return coerceEnv(val, def.type);
+    if (val !== undefined) return coerceEnv(val, def.type) as InferOptionValue<D["type"]>;
   }
 
   // 3. Config file
   if (config && def.config) {
     const val = getPath(config, def.config);
     if (val !== undefined) {
-      if (def.type === "array" && Array.isArray(val)) return val.join(",");
-      return val;
+      if (def.type === "array" && Array.isArray(val)) return val.join(",") as InferOptionValue<D["type"]>;
+      return val as InferOptionValue<D["type"]>;
     }
   }
 
   // 4. Default
-  return def.default;
+  return def.default as InferOptionValue<D["type"]> | undefined;
 }
 
 /**

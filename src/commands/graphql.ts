@@ -10,7 +10,7 @@ import { startMcpServer } from "../mcp-server.js";
 import { resolveFilterOptions } from "./filter-options.js";
 import { parseBindings } from "./bind-options.js";
 import { loadConfigFile, mergeEnvWithConfig } from "../config-file.js";
-import { SHARED_OPTIONS, SPEC_OPTION, resolveOption, registerOptions } from "../options-schema.js";
+import { SPEC_OPTION, resolveOption, registerOptions, findSharedOption } from "../options-schema.js";
 
 const collect = (val: string, acc: string[]) => [...acc, val];
 
@@ -46,8 +46,7 @@ Examples:
     config?: string;
   }) => {
       const configFile = loadConfigFile(opts.config);
-      const findDef = (key: string) => SHARED_OPTIONS.find((d) => d.key === key)!;
-      const endpoint = resolveOption(SPEC_OPTION, endpointArg, process.env, configFile) as string | undefined;
+      const endpoint = resolveOption(SPEC_OPTION, endpointArg, process.env, configFile);
 
       if (!endpoint) {
         process.stderr.write(
@@ -58,7 +57,7 @@ Examples:
         process.exit(1);
       }
 
-      const readonly = resolveOption(findDef("readonly"), opts.readonly, process.env, configFile) as boolean;
+      const readonly = resolveOption(findSharedOption("readonly"), opts.readonly, process.env, configFile) ?? false;
       const bindings = { ...(configFile?.options?.bind ?? {}), ...parseBindings(opts.bind) };
 
       // Build auth headers: config.auth.headers (lowest) < env vars < CLI flags (highest)
@@ -90,8 +89,8 @@ Examples:
 
       const bound = applyBindings(allTools, bindings);
       const mergedOpts = {
-        only: resolveOption(findDef("only"), opts.only, process.env, configFile) as string | undefined,
-        exclude: resolveOption(findDef("exclude"), opts.exclude, process.env, configFile) as string | undefined,
+        only: resolveOption(findSharedOption("only"), opts.only, process.env, configFile),
+        exclude: resolveOption(findSharedOption("exclude"), opts.exclude, process.env, configFile),
       };
       const { only, exclude } = resolveFilterOptions(mergedOpts, bound);
       // readonly is already applied in buildGraphQLTools - pass false here
@@ -100,8 +99,8 @@ Examples:
       if (tools.length === 0) {
         const applied = [
           readonly && "readonly",
-          opts.only && `only=${opts.only}`,
-          opts.exclude && `exclude=${opts.exclude}`,
+          mergedOpts.only && `only=${mergedOpts.only}`,
+          mergedOpts.exclude && `exclude=${mergedOpts.exclude}`,
           Object.keys(bindings).length > 0 &&
             `bind=[${Object.keys(bindings).join(", ")}]`,
         ]
