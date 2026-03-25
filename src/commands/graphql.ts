@@ -9,12 +9,11 @@ import { parseHeaderFlags } from "../auth.js";
 import { startMcpServer } from "../mcp-server.js";
 import { resolveFilterOptions } from "./filter-options.js";
 import { parseBindings } from "./bind-options.js";
+import { loadConfigFile, mergeEnvWithConfig } from "../config-file.js";
 
 const collect = (val: string, acc: string[]) => [...acc, val];
 
-/**
- * Register the `graphql` subcommand onto the given commander program.
- */
+/** Register the `graphql` subcommand onto the given commander program. */
 export function registerGraphqlCommand(program: Command): void {
   program
     .command("graphql")
@@ -25,6 +24,7 @@ export function registerGraphqlCommand(program: Command): void {
     .option("--only <operations>", "Whitelist operations by name, comma-separated")
     .option("--exclude <operations>", "Blacklist operations by name, comma-separated")
     .option("--bind <binding>", "Pre-bind a parameter to a fixed value: key=value (repeatable)", collect, [])
+    .option("--config <path>", "Path to config file (default: auto-discover api-to-mcp.yml/yaml/json)")
     .addHelpText("after", `
 Environment variables:
   API2MCP_SPEC_URL      GraphQL endpoint URL (alternative to positional arg)
@@ -43,11 +43,14 @@ Examples:
       only?: string;
       exclude?: string;
       bind: string[];
+      config?: string;
     }) => {
+      const configFile = loadConfigFile(opts.config);
       const endpoint =
         endpointArg ||
         process.env.API2MCP_SPEC_URL ||
-        process.env.OPENAPI_SPEC_URL;
+        process.env.OPENAPI_SPEC_URL ||
+        configFile?.spec;
 
       if (!endpoint) {
         process.stderr.write(
@@ -58,20 +61,20 @@ Examples:
         process.exit(1);
       }
 
-      const readonly = opts.readonly ?? false;
-      const bindings = parseBindings(opts.bind);
+      const readonly = opts.readonly ?? configFile?.options?.readonly ?? false;
+      const bindings = { ...(configFile?.options?.bind ?? {}), ...parseBindings(opts.bind) };
 
-      // Build auth headers from env vars and --header flags
-      const authHeaders: Record<string, string> = {};
-      const authToken = process.env.API2MCP_AUTH_TOKEN;
+      // Build auth headers from config file, env vars and --header flags
+      const mergedEnv = mergeEnvWithConfig(process.env, configFile?.auth);
+      const authHeaders: Record<string, string> = {
+        ...(configFile?.auth?.headers ?? {}),
+      };
+      const authToken = mergedEnv.API2MCP_AUTH_TOKEN;
       if (authToken) authHeaders["Authorization"] = authToken;
-      const bearerToken =
-        process.env.API2MCP_BEARER_TOKEN ?? process.env.OPENAPI_BEARER_TOKEN;
+      const bearerToken = mergedEnv.API2MCP_BEARER_TOKEN ?? mergedEnv.OPENAPI_BEARER_TOKEN;
       if (bearerToken) authHeaders["Authorization"] = `Bearer ${bearerToken}`;
-      const apiKey =
-        process.env.API2MCP_API_KEY ?? process.env.OPENAPI_API_KEY;
+      const apiKey = mergedEnv.API2MCP_API_KEY ?? mergedEnv.OPENAPI_API_KEY;
       if (apiKey) authHeaders["X-API-Key"] = apiKey;
-      // CLI --header flags override env vars
       Object.assign(authHeaders, parseHeaderFlags(opts.header));
 
       const schema = await loadGraphQLSchema(endpoint, authHeaders);
@@ -92,8 +95,12 @@ Examples:
       }
 
       const bound = applyBindings(allTools, bindings);
-      const { only, exclude } = resolveFilterOptions(opts, bound);
-      // readonly is already applied in buildGraphQLTools — pass false here
+      const mergedOpts = {
+        only: opts.only ?? configFile?.options?.only?.join(","),
+        exclude: opts.exclude ?? configFile?.options?.exclude?.join(","),
+      };
+      const { only, exclude } = resolveFilterOptions(mergedOpts, bound);
+      // readonly is already applied in buildGraphQLTools - pass false here
       const tools = filterTools(bound, { only, exclude });
 
       if (tools.length === 0) {
