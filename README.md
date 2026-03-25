@@ -1,18 +1,41 @@
 # api-to-mcp
 
-Turn any API into an MCP server via stdio bridge — connect OpenAPI-described REST APIs (and GraphQL, coming soon) directly to Claude, Cursor, or any MCP client.
+[![npm version](https://img.shields.io/npm/v/@sgaluza/api-to-mcp)](https://www.npmjs.com/package/@sgaluza/api-to-mcp)
+[![npm downloads](https://img.shields.io/npm/dm/@sgaluza/api-to-mcp)](https://www.npmjs.com/package/@sgaluza/api-to-mcp)
+[![CI](https://github.com/sgaluza/api-to-mcp/actions/workflows/ci.yml/badge.svg)](https://github.com/sgaluza/api-to-mcp/actions/workflows/ci.yml)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+
+**Turn any API into an MCP server in one command.**
+
+Connect OpenAPI REST and GraphQL APIs directly to Claude, Cursor, or any [MCP](https://modelcontextprotocol.io) client — no code required.
 
 ```bash
 npx @sgaluza/api-to-mcp rest https://api.example.com/openapi.yaml
+```
+
+```
+OpenAPI spec / GraphQL schema
+        │
+        ▼
+  api-to-mcp (stdio)
+        │
+        ├── tool: getUser
+        ├── tool: listIssues
+        ├── tool: createIssue
+        └── tool: ...
+        │
+        ▼
+  Claude / Cursor / any MCP client
 ```
 
 ---
 
 ## Table of Contents
 
+- [Quick start](#quick-start)
 - [OpenAPI / REST](#openapi--rest)
-  - [Quick start](#quick-start)
   - [Authentication](#authentication)
+  - [Config file](#config-file)
   - [Filtering tools](#filtering-tools)
   - [Pre-binding parameters](#pre-binding-parameters)
   - [Environment variables](#environment-variables)
@@ -23,60 +46,102 @@ npx @sgaluza/api-to-mcp rest https://api.example.com/openapi.yaml
 
 ---
 
-## OpenAPI / REST
-
-### Quick start
+## Quick start
 
 ```bash
-# From a remote URL
+# REST — from a remote OpenAPI spec
 npx @sgaluza/api-to-mcp rest https://api.example.com/openapi.yaml
 
-# From a local file
+# REST — from a local file
 npx @sgaluza/api-to-mcp rest ./openapi.yaml
 
-# Spec URL via environment variable (useful in MCP config files)
-API2MCP_SPEC_URL=https://api.example.com/openapi.yaml npx @sgaluza/api-to-mcp rest
+# GraphQL — from an endpoint (auto-introspects schema)
+npx @sgaluza/api-to-mcp graphql https://api.example.com/graphql
+
+# GraphQL — from a local SDL file
+npx @sgaluza/api-to-mcp graphql ./schema.graphql
 ```
 
-Every `operationId` in your spec becomes an MCP tool. If an operation has no `operationId`, a name is generated from the method and path (e.g. `GET /users/{id}` → `get_users_id`).
+Every `operationId` (REST) or operation name (GraphQL) becomes an MCP tool. If an operation has no `operationId`, a name is generated from the method and path (e.g. `GET /users/{id}` → `get_users_id`).
+
+---
+
+## OpenAPI / REST
 
 ### Authentication
 
-Pass credentials via `--header` flags or environment variables.
+Pass credentials via `--header` flags, environment variables, or a [config file](#config-file).
 
 **Header flags** — added to every outgoing request:
 
 ```bash
-# Single header
-npx @sgaluza/api-to-mcp rest ./openapi.yaml \
-  -H "X-API-Key: pk_live_xxx"
-
-# Multiple headers
 npx @sgaluza/api-to-mcp rest ./openapi.yaml \
   -H "X-API-Key: pk_live_xxx" \
   -H "X-Workspace-Id: ws_abc"
 ```
 
-**Environment variables** — resolved automatically:
+**Environment variables:**
 
 ```bash
 # Bearer token → Authorization: Bearer <token>
 API2MCP_BEARER_TOKEN=eyJhbG... npx @sgaluza/api-to-mcp rest ./openapi.yaml
 
-# API key — header name is detected from securitySchemes in the spec
+# API key — header name detected from securitySchemes in the spec
 API2MCP_API_KEY=pk_live_xxx npx @sgaluza/api-to-mcp rest ./openapi.yaml
+
+# Raw Authorization header value (e.g. Linear API keys use "lin_api_xxx" without Bearer)
+API2MCP_AUTH_TOKEN=lin_api_xxx npx @sgaluza/api-to-mcp rest ./openapi.yaml
 ```
 
-Auth resolution order (highest wins):
-1. `--header` / `-H` flags
-2. `API2MCP_BEARER_TOKEN` → `Authorization: Bearer {token}`
-3. `API2MCP_API_KEY` → header name from `securitySchemes` in spec
+**Auth resolution order** (highest priority wins):
+
+| Priority | Source | Result |
+|----------|--------|--------|
+| 1 (highest) | `--header` / `-H` flags | Used as-is |
+| 2 | `API2MCP_BEARER_TOKEN` env | `Authorization: Bearer <token>` |
+| 3 | `API2MCP_API_KEY` env | Header name from `securitySchemes` in spec |
+| 4 | `API2MCP_AUTH_TOKEN` env | Raw `Authorization: <token>` |
+| 5 (lowest) | `auth` in config file | Overridden by any env var above |
 
 > Legacy aliases `OPENAPI_BEARER_TOKEN`, `OPENAPI_API_KEY`, `OPENAPI_SPEC_URL` are still supported.
 
-### Filtering tools
+---
 
-By default all operations in the spec are exposed as MCP tools. Use filters to narrow the set.
+### Config file
+
+Store your spec URL, auth, and options in a file instead of passing flags every time.
+
+**Auto-discovery:** `api-to-mcp.yml`, `api-to-mcp.yaml`, or `api-to-mcp.json` in the current directory.
+
+**Explicit path:** `--config path/to/config.yml`
+
+```yaml
+# api-to-mcp.yml
+spec: https://api.example.com/openapi.yaml
+
+auth:
+  bearer: eyJhbG...          # → Authorization: Bearer <token>
+  # apiKey: pk_live_xxx      # → header from securitySchemes
+  # token: lin_api_xxx       # → raw Authorization header
+  headers:                   # arbitrary headers (lowest priority)
+    X-Workspace-Id: ws_abc
+
+options:
+  readonly: true             # only GET/HEAD operations
+  only:
+    - getIssue
+    - listIssues
+  exclude:
+    - deleteEverything
+  bind:
+    teamId: TEAM_ABC
+```
+
+**Priority:** CLI flags > environment variables > config file.
+
+---
+
+### Filtering tools
 
 **Read-only mode** — expose only `GET` and `HEAD` operations:
 
@@ -98,11 +163,13 @@ npx @sgaluza/api-to-mcp rest ./openapi.yaml \
   --exclude "deleteIssue,archiveProject,purgeWorkspace"
 ```
 
-> `--only` and `--exclude` are mutually exclusive. Pass operation names as a comma-separated list.
+> `--only` and `--exclude` are mutually exclusive.
+
+---
 
 ### Pre-binding parameters
 
-Pre-bind a path or query parameter to a fixed value with `--bind key=value`. The parameter is hidden from the MCP tool's input schema — the bridge injects it automatically on every call.
+Pre-bind a path or query parameter to a fixed value with `--bind key=value`. The parameter is removed from the MCP tool's input schema — the bridge injects it automatically on every call.
 
 Useful when you want Claude to operate within a specific workspace, team, or project without being able to change it.
 
@@ -111,37 +178,38 @@ Useful when you want Claude to operate within a specific workspace, team, or pro
 npx @sgaluza/api-to-mcp rest ./openapi.yaml \
   --bind "teamId=TEAM_ABC"
 
-# Scope to a specific project and environment
+# Scope to a specific project
 npx @sgaluza/api-to-mcp rest ./openapi.yaml \
   --bind "projectId=PROJ_XYZ" \
   --bind "env=production"
-
-# Combine with other filters
-npx @sgaluza/api-to-mcp rest ./openapi.yaml \
-  --readonly \
-  --bind "orgId=ORG_123" \
-  --only "listMembers,getOrgDetails"
 ```
 
-The bridge warns you if a bound key is not found in any tool (likely a typo):
+The bridge warns if a bound key is not found in any tool (likely a typo):
 
 ```
 Warning: --bind key 'temId' not found in any tool. Check for typos.
 ```
 
-> **Note:** The `body` parameter (used for `POST`/`PUT`/`PATCH` request bodies) cannot be pre-bound — use `--header` for request-level overrides instead.
+> **Note:** The `body` parameter (POST/PUT/PATCH request bodies) cannot be pre-bound.
+
+---
 
 ### Environment variables
 
 | Variable | Description |
-|---|---|
+|----------|-------------|
 | `API2MCP_SPEC_URL` | OpenAPI spec URL or file path (alternative to positional argument) |
-| `API2MCP_API_KEY` | API key — header name auto-detected from `securitySchemes` |
-| `API2MCP_BEARER_TOKEN` | Bearer token — added as `Authorization: Bearer <token>` |
+| `API2MCP_BEARER_TOKEN` | Bearer token → `Authorization: Bearer <token>` |
+| `API2MCP_API_KEY` | API key → header name from `securitySchemes` |
+| `API2MCP_AUTH_TOKEN` | Raw `Authorization` header value |
+
+---
 
 ### MCP client configuration
 
-**Claude Code / Claude Desktop / MetaMCP** — add to your `mcp_settings.json` or `claude_desktop_config.json`:
+Add to your `mcp_settings.json`, `claude_desktop_config.json`, or equivalent:
+
+**Minimal:**
 
 ```json
 {
@@ -157,7 +225,7 @@ Warning: --bind key 'temId' not found in any tool. Check for typos.
 }
 ```
 
-**Read-only API with bearer token:**
+**GitHub — read-only with bearer token:**
 
 ```json
 {
@@ -177,7 +245,7 @@ Warning: --bind key 'temId' not found in any tool. Check for typos.
 }
 ```
 
-**Scoped to a specific team with selected operations:**
+**Linear — scoped to a team, specific operations:**
 
 ```json
 {
@@ -186,7 +254,7 @@ Warning: --bind key 'temId' not found in any tool. Check for typos.
       "command": "npx",
       "args": [
         "-y", "@sgaluza/api-to-mcp", "rest",
-        "https://api.linear.app/graphql",
+        "https://api.linear.app/rest/openapi.yaml",
         "--bind", "teamId=TEAM_ABC",
         "--only", "listIssues,getIssue,createIssue,updateIssue"
       ],
@@ -198,38 +266,77 @@ Warning: --bind key 'temId' not found in any tool. Check for typos.
 }
 ```
 
+**Using a config file:**
+
+```json
+{
+  "mcpServers": {
+    "my-api": {
+      "command": "npx",
+      "args": ["-y", "@sgaluza/api-to-mcp", "rest", "--config", "/path/to/api-to-mcp.yml"]
+    }
+  }
+}
+```
+
 ---
 
 ## GraphQL
 
-GraphQL support is in development.
-
 ```bash
-# Coming soon
+# Auto-introspect schema from a GraphQL endpoint
 npx @sgaluza/api-to-mcp graphql https://api.example.com/graphql
+
+# Load schema from a local SDL file
 npx @sgaluza/api-to-mcp graphql ./schema.graphql
 ```
 
-Planned flags match the REST subcommand: `--header`, `--readonly` (queries only, no mutations), `--only`, `--exclude`, `--bind`.
+All queries and mutations become MCP tools. The same flags apply: `--header`, `--readonly` (queries only, no mutations), `--only`, `--exclude`, `--bind`, `--config`.
 
-Track progress: [github.com/sgaluza/api-to-mcp/issues/1](https://github.com/sgaluza/api-to-mcp/issues/1)
+**MCP client config:**
+
+```json
+{
+  "mcpServers": {
+    "my-graphql-api": {
+      "command": "npx",
+      "args": ["-y", "@sgaluza/api-to-mcp", "graphql", "https://api.example.com/graphql"],
+      "env": {
+        "API2MCP_BEARER_TOKEN": "eyJhbG..."
+      }
+    }
+  }
+}
+```
 
 ---
 
 ## How it works
 
-Each OpenAPI operation is converted to an MCP tool at startup:
+Each API operation is converted to an MCP tool at startup:
+
+**REST (OpenAPI):**
 
 | OpenAPI | MCP tool |
-|---|---|
+|---------|----------|
 | `operationId` | Tool name (fallback: `{method}_{path}`) |
-| `summary` + `description` | Tool description (description truncated to 200 chars) |
+| `summary` + `description` | Tool description |
 | Path params `{id}` | Required input parameters |
-| Query params | Optional input parameters (required if `required: true` in spec) |
-| `requestBody` (application/json) | `body` parameter (object matching the schema) |
+| Query params | Optional input parameters |
+| `requestBody` (application/json) | `body` parameter |
 | `servers[0].url` | Base URL for all requests |
 
+**GraphQL:**
+
+| GraphQL | MCP tool |
+|---------|----------|
+| Query / Mutation name | Tool name |
+| Description from schema | Tool description |
+| Arguments | Input parameters |
+| Return type fields | Included in description |
+
 When Claude calls a tool, the bridge:
+
 1. Substitutes path parameters into the URL template
 2. Appends query parameters
 3. Serialises `body` as JSON (for POST/PUT/PATCH)
