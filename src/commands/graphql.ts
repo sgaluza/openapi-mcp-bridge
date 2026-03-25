@@ -5,7 +5,7 @@ import { buildGraphQLTools } from "../graphql-tool-builder.js";
 import type { GraphQLToolDefinition } from "../graphql-tool-builder.js";
 import { executeGraphQLCall } from "../graphql-executor.js";
 import { filterTools, applyBindings } from "../tool-builder.js";
-import { parseHeaderFlags } from "../auth.js";
+import { parseHeaderFlags, resolveAuthHeaders } from "../auth.js";
 import { startMcpServer } from "../mcp-server.js";
 import { resolveFilterOptions } from "./filter-options.js";
 import { parseBindings } from "./bind-options.js";
@@ -64,18 +64,15 @@ Examples:
       const readonly = opts.readonly ?? configFile?.options?.readonly ?? false;
       const bindings = { ...(configFile?.options?.bind ?? {}), ...parseBindings(opts.bind) };
 
-      // Build auth headers from config file, env vars and --header flags
+      // Build auth headers: config.auth.headers (lowest) < env vars < CLI flags (highest)
       const mergedEnv = mergeEnvWithConfig(process.env, configFile?.auth);
-      const authHeaders: Record<string, string> = {
+      const authHeaders = {
         ...(configFile?.auth?.headers ?? {}),
+        ...resolveAuthHeaders(null, {
+          cliHeaders: parseHeaderFlags(opts.header),
+          env: mergedEnv,
+        }),
       };
-      const authToken = mergedEnv.API2MCP_AUTH_TOKEN;
-      if (authToken) authHeaders["Authorization"] = authToken;
-      const bearerToken = mergedEnv.API2MCP_BEARER_TOKEN ?? mergedEnv.OPENAPI_BEARER_TOKEN;
-      if (bearerToken) authHeaders["Authorization"] = `Bearer ${bearerToken}`;
-      const apiKey = mergedEnv.API2MCP_API_KEY ?? mergedEnv.OPENAPI_API_KEY;
-      if (apiKey) authHeaders["X-API-Key"] = apiKey;
-      Object.assign(authHeaders, parseHeaderFlags(opts.header));
 
       const schema = await loadGraphQLSchema(endpoint, authHeaders);
       const allTools = buildGraphQLTools(schema, { readonly });

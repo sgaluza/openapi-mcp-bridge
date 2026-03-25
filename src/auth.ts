@@ -20,7 +20,7 @@ export interface AuthConfig {
  * Legacy OPENAPI_* variables are supported as aliases for backwards compatibility.
  */
 export function resolveAuthHeaders(
-  spec: OpenAPISpec,
+  spec: OpenAPISpec | null,
   config: AuthConfig
 ): Record<string, string> {
   const headers: Record<string, string> = {};
@@ -39,8 +39,9 @@ export function resolveAuthHeaders(
 
   // 3. API2MCP_API_KEY from env — find matching securityScheme (OPENAPI_API_KEY as legacy alias)
   const apiKey = config.env.API2MCP_API_KEY ?? config.env.OPENAPI_API_KEY;
-  if (apiKey && spec.components?.securitySchemes) {
-    const scheme = findApiKeyScheme(spec.components.securitySchemes);
+  if (apiKey) {
+    const schemes = spec?.components?.securitySchemes;
+    const scheme = schemes ? findApiKeyScheme(schemes) : undefined;
     if (scheme && scheme.in === "header" && scheme.name) {
       headers[scheme.name] = apiKey;
     } else if (scheme && scheme.in === "query") {

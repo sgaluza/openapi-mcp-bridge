@@ -89,10 +89,13 @@ Examples:
 
       const baseUrl = resolveBaseUrl(spec.servers?.[0]?.url, specSource);
       const mergedEnv = mergeEnvWithConfig(process.env, configFile?.auth);
-      const authHeaders = resolveAuthHeaders(spec, {
-        cliHeaders: { ...(configFile?.auth?.headers ?? {}), ...parseHeaderFlags(opts.header) },
-        env: mergedEnv,
-      });
+      const authHeaders = {
+        ...(configFile?.auth?.headers ?? {}),
+        ...resolveAuthHeaders(spec, {
+          cliHeaders: parseHeaderFlags(opts.header),
+          env: mergedEnv,
+        }),
+      };
 
       await startMcpServer({
         serverName,
