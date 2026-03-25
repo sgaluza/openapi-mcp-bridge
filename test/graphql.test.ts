@@ -1324,4 +1324,26 @@ describe("graphqlTypeToJsonSchema — nested INPUT_OBJECT capped at depth 1", ()
     expect(inner.description).toContain("value"); // field names listed in description
     expect(inner).not.toHaveProperty("properties");
   });
+
+  it("uses fallback description when nested INPUT_OBJECT has no inputFields", () => {
+    const types: IntrospectionType[] = [
+      {
+        kind: "INPUT_OBJECT",
+        name: "OuterInput",
+        inputFields: [
+          { name: "inner", description: null, type: inputRef("EmptyInput"), defaultValue: null },
+        ],
+      },
+      {
+        kind: "INPUT_OBJECT",
+        name: "EmptyInput",
+        inputFields: [],
+      },
+    ];
+    const typeMap = new Map(types.map((t) => [t.name!, t]));
+    const result = graphqlTypeToJsonSchema(inputRef("OuterInput"), typeMap) as Record<string, unknown>;
+    const inner = (result.properties as Record<string, unknown>)["inner"] as Record<string, unknown>;
+    expect(inner.type).toBe("object");
+    expect(inner.description).toBe("EmptyInput input object");
+  });
 });
