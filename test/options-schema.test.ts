@@ -3,6 +3,7 @@ import { Command } from "commander";
 import {
   resolveOption,
   registerOptions,
+  findSharedOption,
   SHARED_OPTIONS,
   SPEC_OPTION,
   type OptionDef,
@@ -243,3 +244,18 @@ describe("SPEC_OPTION structure", () => {
     expect(SPEC_OPTION.config).toBe("spec");
   });
 });
+
+describe("findSharedOption", () => {
+  it("returns option def when key exists", () => {
+    const def = findSharedOption("readonly");
+    expect(def.key).toBe("readonly");
+    expect(def.type).toBe("boolean");
+  });
+
+  it("throws error when key does not exist", () => {
+    expect(() => findSharedOption("nonexistent")).toThrow(
+      "Internal: shared option 'nonexistent' not found in SHARED_OPTIONS",
+    );
+  });
+});
+
