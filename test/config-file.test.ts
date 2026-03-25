@@ -211,6 +211,17 @@ auth:
     expect(stderrWrites.some((w) => w.includes("auth.headers must be an object"))).toBe(true);
   });
 
+  it("warns when auth.headers values are not strings", () => {
+    const filePath = join(tmpDir, "bad-header-values.yml");
+    writeFileSync(filePath, "auth:\n  headers:\n    X-Count: 42\n    X-Enabled: true\n");
+    const stderrWrites: string[] = [];
+    const orig = process.stderr.write.bind(process.stderr);
+    process.stderr.write = (chunk: unknown) => { stderrWrites.push(String(chunk)); return true; };
+    try { loadConfigFile(filePath); } finally { process.stderr.write = orig; }
+    expect(stderrWrites.some((w) => w.includes("auth.headers.X-Count must be a string"))).toBe(true);
+    expect(stderrWrites.some((w) => w.includes("auth.headers.X-Enabled must be a string"))).toBe(true);
+  });
+
   it("prefers api-to-mcp.yml over api-to-mcp.yaml and api-to-mcp.json when multiple exist", () => {
     writeFileSync(join(tmpDir, "api-to-mcp.yml"), "spec: from-yml\n");
     writeFileSync(join(tmpDir, "api-to-mcp.yaml"), "spec: from-yaml\n");

@@ -46,8 +46,16 @@ function parseConfigFile(path: string): ConfigFile {
     for (const key of Object.keys(parsed.auth)) {
       if (!KNOWN_AUTH_KEYS.has(key)) process.stderr.write(`Warning: unknown auth key '${key}' in ${path}\n`);
     }
-    if (parsed.auth.headers !== undefined && (typeof parsed.auth.headers !== "object" || Array.isArray(parsed.auth.headers))) {
-      process.stderr.write(`Warning: auth.headers must be an object in ${path}\n`);
+    if (parsed.auth.headers !== undefined) {
+      if (typeof parsed.auth.headers !== "object" || Array.isArray(parsed.auth.headers)) {
+        process.stderr.write(`Warning: auth.headers must be an object in ${path}\n`);
+      } else {
+        for (const [key, value] of Object.entries(parsed.auth.headers)) {
+          if (typeof value !== "string") {
+            process.stderr.write(`Warning: auth.headers.${key} must be a string, got ${typeof value} in ${path}\n`);
+          }
+        }
+      }
     }
   }
   if (parsed.options && typeof parsed.options === "object") {

@@ -583,6 +583,25 @@ describe("auth", () => {
     expect(authHeaders["Authorization"]).toBe("Bearer config-bearer-token");
   });
 
+  it("BEARER_TOKEN is not overridden by API_KEY when scheme uses Authorization header", () => {
+    // Edge case: spec declares apiKey scheme with name: Authorization
+    const authorizationKeySpec: OpenAPISpec = {
+      ...testSpec,
+      components: {
+        ...testSpec.components,
+        securitySchemes: {
+          apiAuth: { type: "apiKey", name: "Authorization", in: "header" },
+        },
+      },
+    };
+    const headers = resolveAuthHeaders(authorizationKeySpec, {
+      cliHeaders: {},
+      env: { API2MCP_BEARER_TOKEN: "bearer-tok", API2MCP_API_KEY: "api-key" },
+    });
+    // BEARER_TOKEN (priority 2) must not be overwritten by API_KEY (priority 3)
+    expect(headers["Authorization"]).toBe("Bearer bearer-tok");
+  });
+
   it("falls back to X-API-Key when no apiKey-type security scheme exists", () => {
     const bearerOnlySpec: OpenAPISpec = {
       ...testSpec,

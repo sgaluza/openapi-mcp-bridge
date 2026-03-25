@@ -43,7 +43,10 @@ export function resolveAuthHeaders(
     const schemes = spec?.components?.securitySchemes;
     const scheme = schemes ? findApiKeyScheme(schemes) : undefined;
     if (scheme && scheme.in === "header" && scheme.name) {
-      headers[scheme.name] = apiKey;
+      // Don't override Authorization already set by higher-priority BEARER_TOKEN or AUTH_TOKEN
+      if (scheme.name !== "Authorization" || !headers["Authorization"]) {
+        headers[scheme.name] = apiKey;
+      }
     } else if (scheme && scheme.in === "query") {
       // Query params handled at request time, not as headers.
       // Store as a special marker for the executor.
