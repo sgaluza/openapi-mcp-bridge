@@ -1,6 +1,6 @@
 {
   "name": "@sgaluza/api-to-mcp",
-  "version": "0.2.4",
+  "version": "0.2.5",
   "description": "Turn any OpenAPI or GraphQL API into an MCP server via stdio bridge.",
   "type": "module",
   "bin": {
