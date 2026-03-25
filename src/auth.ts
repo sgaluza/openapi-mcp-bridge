@@ -37,7 +37,7 @@ export function resolveAuthHeaders(
     headers["Authorization"] = `Bearer ${bearerToken}`;
   }
 
-  // 2. API2MCP_API_KEY from env — find matching securityScheme (OPENAPI_API_KEY as legacy alias)
+  // 3. API2MCP_API_KEY from env — find matching securityScheme (OPENAPI_API_KEY as legacy alias)
   const apiKey = config.env.API2MCP_API_KEY ?? config.env.OPENAPI_API_KEY;
   if (apiKey && spec.components?.securitySchemes) {
     const scheme = findApiKeyScheme(spec.components.securitySchemes);
@@ -53,7 +53,7 @@ export function resolveAuthHeaders(
     }
   }
 
-  // 3. CLI headers override everything
+  // 4. CLI headers override everything
   Object.assign(headers, config.cliHeaders);
 
   return headers;
