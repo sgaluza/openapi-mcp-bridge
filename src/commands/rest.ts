@@ -8,21 +8,18 @@ import { startMcpServer } from "../mcp-server.js";
 import { resolveFilterOptions } from "./filter-options.js";
 import { parseBindings } from "./bind-options.js";
 import { loadConfigFile, mergeEnvWithConfig } from "../config-file.js";
+import { SHARED_OPTIONS, SPEC_OPTION, resolveOption, registerOptions } from "../options-schema.js";
 
 const collect = (val: string, acc: string[]) => [...acc, val];
 
 /** Register the `rest` subcommand onto the given commander program. */
 export function registerRestCommand(program: Command): void {
-  program
+  const cmd = program
     .command("rest")
     .description("Start an MCP server from an OpenAPI spec")
     .argument("[spec]", "OpenAPI spec URL or file path")
     .option("-H, --header <header>", "Add a request header (repeatable)", collect, [])
-    .option("--readonly", "Expose only read-only operations (GET/HEAD)")
-    .option("--only <operations>", "Whitelist operations by name, comma-separated")
-    .option("--exclude <operations>", "Blacklist operations by name, comma-separated")
     .option("--bind <binding>", "Pre-bind a parameter to a fixed value: key=value (repeatable)", collect, [])
-    .option("--config <path>", "Path to config file (default: auto-discover api-to-mcp.yml/yaml/json)")
     .addHelpText("after", `
 Environment variables:
   API2MCP_SPEC_URL      OpenAPI spec URL or path (alternative to positional arg)
@@ -38,17 +35,21 @@ Examples:
   $ api-to-mcp rest spec.yaml --only "getIssue,listIssues"
   $ api-to-mcp rest spec.yaml --exclude "deleteIssue,archiveProject"
   $ api-to-mcp rest spec.yaml --bind "teamId=TEAM_ABC" --bind "projectId=PROJ_XYZ"
-  $ API2MCP_SPEC_URL=https://api.example.com/openapi.yaml api-to-mcp rest`)
-    .action(async (specArg: string | undefined, opts: { header: string[]; readonly?: boolean; only?: string; exclude?: string; bind: string[]; config?: string }) => {
+  $ API2MCP_SPEC_URL=https://api.example.com/openapi.yaml api-to-mcp rest`);
+
+  registerOptions(cmd, SHARED_OPTIONS);
+
+  cmd.action(async (specArg: string | undefined, opts: { header: string[]; readonly?: boolean; only?: string; exclude?: string; bind: string[]; config?: string }) => {
       const configFile = loadConfigFile(opts.config);
-      const specSource = specArg || process.env.API2MCP_SPEC_URL || process.env.OPENAPI_SPEC_URL || configFile?.spec;
+      const findDef = (key: string) => SHARED_OPTIONS.find((d) => d.key === key)!;
+      const specSource = resolveOption(SPEC_OPTION, specArg, process.env, configFile) as string | undefined;
 
       if (!specSource) {
         process.stderr.write(chalk.red("Error: no spec source provided. Pass as argument or set API2MCP_SPEC_URL.\n"));
         process.exit(1);
       }
 
-      const readonly = opts.readonly ?? configFile?.options?.readonly ?? false;
+      const readonly = resolveOption(findDef("readonly"), opts.readonly, process.env, configFile) as boolean;
       const bindings = { ...(configFile?.options?.bind ?? {}), ...parseBindings(opts.bind) };
 
       const spec = await loadSpec(specSource);
@@ -67,8 +68,8 @@ Examples:
 
       const bound = applyBindings(allTools, bindings);
       const mergedOpts = {
-        only: opts.only ?? configFile?.options?.only?.join(","),
-        exclude: opts.exclude ?? configFile?.options?.exclude?.join(","),
+        only: resolveOption(findDef("only"), opts.only, process.env, configFile) as string | undefined,
+        exclude: resolveOption(findDef("exclude"), opts.exclude, process.env, configFile) as string | undefined,
       };
       const { only, exclude } = resolveFilterOptions(mergedOpts, bound);
       const tools = filterTools(bound, { readonly, only, exclude });

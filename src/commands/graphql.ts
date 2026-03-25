@@ -10,21 +10,18 @@ import { startMcpServer } from "../mcp-server.js";
 import { resolveFilterOptions } from "./filter-options.js";
 import { parseBindings } from "./bind-options.js";
 import { loadConfigFile, mergeEnvWithConfig } from "../config-file.js";
+import { SHARED_OPTIONS, SPEC_OPTION, resolveOption, registerOptions } from "../options-schema.js";
 
 const collect = (val: string, acc: string[]) => [...acc, val];
 
 /** Register the `graphql` subcommand onto the given commander program. */
 export function registerGraphqlCommand(program: Command): void {
-  program
+  const cmd = program
     .command("graphql")
     .description("Start an MCP server from a GraphQL schema")
     .argument("[endpoint]", "GraphQL endpoint URL or SDL file path")
     .option("-H, --header <header>", "Add a request header (repeatable)", collect, [])
-    .option("--readonly", "Expose only Query operations (no Mutations)")
-    .option("--only <operations>", "Whitelist operations by name, comma-separated")
-    .option("--exclude <operations>", "Blacklist operations by name, comma-separated")
     .option("--bind <binding>", "Pre-bind a parameter to a fixed value: key=value (repeatable)", collect, [])
-    .option("--config <path>", "Path to config file (default: auto-discover api-to-mcp.yml/yaml/json)")
     .addHelpText("after", `
 Environment variables:
   API2MCP_SPEC_URL      GraphQL endpoint URL (alternative to positional arg)
@@ -36,21 +33,21 @@ Examples:
   $ api-to-mcp graphql ./schema.graphql
   $ api-to-mcp graphql https://api.linear.app/graphql --readonly
   $ api-to-mcp graphql https://api.example.com/graphql --only "query_issues,query_viewer"
-  $ api-to-mcp graphql https://api.example.com/graphql --bind "teamId=TEAM_ABC"`)
-    .action(async (endpointArg: string, opts: {
-      header: string[];
-      readonly?: boolean;
-      only?: string;
-      exclude?: string;
-      bind: string[];
-      config?: string;
-    }) => {
+  $ api-to-mcp graphql https://api.example.com/graphql --bind "teamId=TEAM_ABC"`);
+
+  registerOptions(cmd, SHARED_OPTIONS);
+
+  cmd.action(async (endpointArg: string, opts: {
+    header: string[];
+    readonly?: boolean;
+    only?: string;
+    exclude?: string;
+    bind: string[];
+    config?: string;
+  }) => {
       const configFile = loadConfigFile(opts.config);
-      const endpoint =
-        endpointArg ||
-        process.env.API2MCP_SPEC_URL ||
-        process.env.OPENAPI_SPEC_URL ||
-        configFile?.spec;
+      const findDef = (key: string) => SHARED_OPTIONS.find((d) => d.key === key)!;
+      const endpoint = resolveOption(SPEC_OPTION, endpointArg, process.env, configFile) as string | undefined;
 
       if (!endpoint) {
         process.stderr.write(
@@ -61,7 +58,7 @@ Examples:
         process.exit(1);
       }
 
-      const readonly = opts.readonly ?? configFile?.options?.readonly ?? false;
+      const readonly = resolveOption(findDef("readonly"), opts.readonly, process.env, configFile) as boolean;
       const bindings = { ...(configFile?.options?.bind ?? {}), ...parseBindings(opts.bind) };
 
       // Build auth headers: config.auth.headers (lowest) < env vars < CLI flags (highest)
@@ -93,8 +90,8 @@ Examples:
 
       const bound = applyBindings(allTools, bindings);
       const mergedOpts = {
-        only: opts.only ?? configFile?.options?.only?.join(","),
-        exclude: opts.exclude ?? configFile?.options?.exclude?.join(","),
+        only: resolveOption(findDef("only"), opts.only, process.env, configFile) as string | undefined,
+        exclude: resolveOption(findDef("exclude"), opts.exclude, process.env, configFile) as string | undefined,
       };
       const { only, exclude } = resolveFilterOptions(mergedOpts, bound);
       // readonly is already applied in buildGraphQLTools - pass false here
