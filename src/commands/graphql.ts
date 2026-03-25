@@ -25,6 +25,9 @@ export function registerGraphqlCommand(program: Command): void {
     .addHelpText("after", `
 Environment variables:
   API2MCP_SPEC_URL      GraphQL endpoint URL (alternative to positional arg)
+  API2MCP_READONLY      Expose only read operations (same as --readonly)
+  API2MCP_ONLY          Whitelist operations, comma-separated (same as --only)
+  API2MCP_EXCLUDE       Blacklist operations, comma-separated (same as --exclude)
   API2MCP_BEARER_TOKEN  Bearer token (adds Authorization: Bearer header)
   API2MCP_API_KEY       API key (adds X-API-Key header)
 
