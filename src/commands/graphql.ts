@@ -18,7 +18,7 @@ export function registerGraphqlCommand(program: Command): void {
   program
     .command("graphql")
     .description("Start an MCP server from a GraphQL schema")
-    .argument("<endpoint>", "GraphQL endpoint URL or SDL file path")
+    .argument("[endpoint]", "GraphQL endpoint URL or SDL file path")
     .option("-H, --header <header>", "Add a request header (repeatable)", collect, [])
     .option("--readonly", "Expose only Query operations (no Mutations)")
     .option("--only <operations>", "Whitelist operations by name, comma-separated")

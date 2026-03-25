@@ -29,11 +29,28 @@ export function mergeEnvWithConfig(env: Record<string, string | undefined>, auth
   };
 }
 
+const KNOWN_KEYS = new Set(["spec", "auth", "options"]);
+const KNOWN_AUTH_KEYS = new Set(["token", "bearer", "apiKey", "headers"]);
+const KNOWN_OPTIONS_KEYS = new Set(["readonly", "only", "exclude", "bind"]);
+
 function parseConfigFile(path: string): ConfigFile {
   const content = readFileSync(path, "utf8");
   const parsed = parse(content) as ConfigFile;
   if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
     throw new Error(`Config file "${path}" must contain a YAML/JSON object.`);
+  }
+  for (const key of Object.keys(parsed)) {
+    if (!KNOWN_KEYS.has(key)) process.stderr.write(`Warning: unknown config key '${key}' in ${path}\n`);
+  }
+  if (parsed.auth && typeof parsed.auth === "object") {
+    for (const key of Object.keys(parsed.auth)) {
+      if (!KNOWN_AUTH_KEYS.has(key)) process.stderr.write(`Warning: unknown auth key '${key}' in ${path}\n`);
+    }
+  }
+  if (parsed.options && typeof parsed.options === "object") {
+    for (const key of Object.keys(parsed.options)) {
+      if (!KNOWN_OPTIONS_KEYS.has(key)) process.stderr.write(`Warning: unknown options key '${key}' in ${path}\n`);
+    }
   }
   return parsed;
 }

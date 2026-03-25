@@ -118,6 +118,48 @@ auth:
     expect(config?.spec).toBe("https://example.com/openapi.json");
   });
 
+  it("warns about unknown top-level keys in config file", () => {
+    const filePath = join(tmpDir, "warn-config.yml");
+    writeFileSync(filePath, "spec: https://example.com/openapi.yaml\nbarer: typo\n");
+    const stderrWrites: string[] = [];
+    const orig = process.stderr.write.bind(process.stderr);
+    process.stderr.write = (chunk: unknown) => { stderrWrites.push(String(chunk)); return true; };
+    try {
+      loadConfigFile(filePath);
+    } finally {
+      process.stderr.write = orig;
+    }
+    expect(stderrWrites.some((w) => w.includes("unknown config key 'barer'"))).toBe(true);
+  });
+
+  it("warns about unknown auth keys in config file", () => {
+    const filePath = join(tmpDir, "warn-auth.yml");
+    writeFileSync(filePath, "auth:\n  bearer: tok\n  typoKey: oops\n");
+    const stderrWrites: string[] = [];
+    const orig = process.stderr.write.bind(process.stderr);
+    process.stderr.write = (chunk: unknown) => { stderrWrites.push(String(chunk)); return true; };
+    try {
+      loadConfigFile(filePath);
+    } finally {
+      process.stderr.write = orig;
+    }
+    expect(stderrWrites.some((w) => w.includes("unknown auth key 'typoKey'"))).toBe(true);
+  });
+
+  it("warns about unknown options keys in config file", () => {
+    const filePath = join(tmpDir, "warn-opts.yml");
+    writeFileSync(filePath, "options:\n  readonly: true\n  onli: [getUsers]\n");
+    const stderrWrites: string[] = [];
+    const orig = process.stderr.write.bind(process.stderr);
+    process.stderr.write = (chunk: unknown) => { stderrWrites.push(String(chunk)); return true; };
+    try {
+      loadConfigFile(filePath);
+    } finally {
+      process.stderr.write = orig;
+    }
+    expect(stderrWrites.some((w) => w.includes("unknown options key 'onli'"))).toBe(true);
+  });
+
   it("prefers api-to-mcp.yml over api-to-mcp.yaml and api-to-mcp.json when multiple exist", () => {
     writeFileSync(join(tmpDir, "api-to-mcp.yml"), "spec: from-yml\n");
     writeFileSync(join(tmpDir, "api-to-mcp.yaml"), "spec: from-yaml\n");
