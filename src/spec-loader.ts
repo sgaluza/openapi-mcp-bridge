@@ -86,20 +86,26 @@ export function resolveRef<T>(spec: OpenAPISpec, ref: string): T {
 /**
  * Recursively resolve all $ref pointers in a JSON Schema object.
  * Handles circular references by tracking visited refs.
+ * Uses a shared cache to memoize resolved schemas — prevents exponential blowup
+ * when many operations reference the same shared component schemas.
  */
 export function resolveSchemaRefs(
   spec: OpenAPISpec,
   schema: JSONSchema,
-  visited = new Set<string>()
+  cache: Map<string, JSONSchema> = new Map(),
+  visiting: Set<string> = new Set()
 ): JSONSchema {
   if (isRef(schema)) {
     const ref = (schema as RefObject).$ref;
-    if (visited.has(ref)) {
-      return { description: `Circular reference: ${ref}` };
-    }
-    visited.add(ref);
+    if (cache.has(ref)) return cache.get(ref)!;
+    if (visiting.has(ref)) return { description: `Circular reference: ${ref}` };
+
+    visiting.add(ref);
     const resolved = resolveRef<JSONSchema>(spec, ref);
-    return resolveSchemaRefs(spec, resolved, visited);
+    const result = resolveSchemaRefs(spec, resolved, cache, visiting);
+    visiting.delete(ref);
+    cache.set(ref, result);
+    return result;
   }
 
   const result: JSONSchema = {};
@@ -109,23 +115,15 @@ export function resolveSchemaRefs(
       for (const [propName, propSchema] of Object.entries(
         value as Record<string, JSONSchema>
       )) {
-        props[propName] = resolveSchemaRefs(spec, propSchema, new Set(visited));
+        props[propName] = resolveSchemaRefs(spec, propSchema, cache, visiting);
       }
       result[key] = props;
     } else if (key === "items" && typeof value === "object" && value !== null) {
-      result[key] = resolveSchemaRefs(
-        spec,
-        value as JSONSchema,
-        new Set(visited)
-      );
-    } else if (
-      key === "allOf" ||
-      key === "oneOf" ||
-      key === "anyOf"
-    ) {
+      result[key] = resolveSchemaRefs(spec, value as JSONSchema, cache, visiting);
+    } else if (key === "allOf" || key === "oneOf" || key === "anyOf") {
       if (Array.isArray(value)) {
         result[key] = value.map((item: JSONSchema) =>
-          resolveSchemaRefs(spec, item, new Set(visited))
+          resolveSchemaRefs(spec, item, cache, visiting)
         );
       }
     } else if (
@@ -133,11 +131,7 @@ export function resolveSchemaRefs(
       typeof value === "object" &&
       value !== null
     ) {
-      result[key] = resolveSchemaRefs(
-        spec,
-        value as JSONSchema,
-        new Set(visited)
-      );
+      result[key] = resolveSchemaRefs(spec, value as JSONSchema, cache, visiting);
     } else {
       result[key] = value;
     }

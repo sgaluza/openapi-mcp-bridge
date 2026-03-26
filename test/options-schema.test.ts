@@ -6,6 +6,7 @@ import {
   findSharedOption,
   SHARED_OPTIONS,
   SPEC_OPTION,
+  BASE_URL_OPTION,
   type OptionDef,
 } from "../src/options-schema.js";
 import type { ConfigFile } from "../src/config-file.js";
@@ -256,6 +257,55 @@ describe("findSharedOption", () => {
     expect(() => findSharedOption("nonexistent")).toThrow(
       "Internal: shared option 'nonexistent' not found in SHARED_OPTIONS",
     );
+  });
+});
+
+describe("BASE_URL_OPTION structure", () => {
+  it("has a cli flag --base-url", () => {
+    expect(BASE_URL_OPTION.cli).toBe("--base-url <url>");
+  });
+
+  it("reads from API2MCP_BASE_URL env var", () => {
+    expect(BASE_URL_OPTION.env).toBe("API2MCP_BASE_URL");
+  });
+
+  it("maps to options.baseUrl config path", () => {
+    expect(BASE_URL_OPTION.config).toBe("options.baseUrl");
+  });
+
+  it("resolves CLI value with highest priority", () => {
+    const result = resolveOption(
+      BASE_URL_OPTION,
+      "https://prod.example.com",
+      { API2MCP_BASE_URL: "https://env.example.com" },
+      { options: { baseUrl: "https://config.example.com" } }
+    );
+    expect(result).toBe("https://prod.example.com");
+  });
+
+  it("resolves env var when CLI is absent", () => {
+    const result = resolveOption(
+      BASE_URL_OPTION,
+      undefined,
+      { API2MCP_BASE_URL: "https://env.example.com" },
+      null
+    );
+    expect(result).toBe("https://env.example.com");
+  });
+
+  it("resolves config file value when CLI and env are absent", () => {
+    const result = resolveOption(
+      BASE_URL_OPTION,
+      undefined,
+      {},
+      { options: { baseUrl: "https://config.example.com" } }
+    );
+    expect(result).toBe("https://config.example.com");
+  });
+
+  it("returns undefined when no source provides a value", () => {
+    const result = resolveOption(BASE_URL_OPTION, undefined, {}, null);
+    expect(result).toBeUndefined();
   });
 });
 

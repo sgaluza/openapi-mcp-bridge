@@ -41,7 +41,7 @@ export async function executeGraphQLCall(
   args: Record<string, unknown>,
   endpoint: string,
   headers: Record<string, string>
-): Promise<{ content: string; isError: boolean }> {
+): Promise<{ content: string; isError: boolean; httpStatus?: number }> {
   const query = buildGraphQLQuery(tool);
 
   // Build variables map — only include declared variable definitions, not extra args
@@ -69,6 +69,7 @@ export async function executeGraphQLCall(
       return {
         content: `HTTP ${response.status} ${response.statusText}\n\n${responseText}`,
         isError: true,
+        httpStatus: response.status,
       };
     }
 
@@ -80,6 +81,7 @@ export async function executeGraphQLCall(
         return {
           content: JSON.stringify(json.errors, null, 2),
           isError: true,
+          httpStatus: response.status,
         };
       }
 
@@ -90,10 +92,11 @@ export async function executeGraphQLCall(
       return {
         content: JSON.stringify(data ?? json.data ?? json, null, 2),
         isError: false,
+        httpStatus: response.status,
       };
     } catch {
       // Non-JSON response (e.g. HTML error page from a proxy) — return raw text as-is
-      return { content: responseText, isError: false };
+      return { content: responseText, isError: false, httpStatus: response.status };
     }
   } catch (error) {
     return {

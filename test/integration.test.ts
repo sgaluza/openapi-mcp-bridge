@@ -403,6 +403,34 @@ describe("resolveSchemaRefs", () => {
     expect(resolved.additionalProperties).toEqual({ type: "string" });
   });
 
+  it("resolves shared $ref (diamond pattern) correctly without memoization explosion", () => {
+    // A spec where the same $ref is used in many places.
+    // Without caching this resolves the same schema N times (exponential with nesting).
+    const sharedSpec: OpenAPISpec = {
+      ...testSpec,
+      components: {
+        schemas: {
+          Address: { type: "object", properties: { street: { type: "string" }, city: { type: "string" } } },
+        },
+      },
+    };
+    // 50 properties all pointing at the same $ref
+    const properties: Record<string, unknown> = {};
+    for (let i = 0; i < 50; i++) {
+      properties[`addr${i}`] = { $ref: "#/components/schemas/Address" };
+    }
+    const schema = { type: "object", properties };
+
+    const resolved = resolveSchemaRefs(sharedSpec, schema as JSONSchema);
+    // All 50 properties must resolve correctly
+    for (let i = 0; i < 50; i++) {
+      expect((resolved.properties as Record<string, unknown>)[`addr${i}`]).toEqual({
+        type: "object",
+        properties: { street: { type: "string" }, city: { type: "string" } },
+      });
+    }
+  });
+
   it("handles circular references gracefully", () => {
     const circularSpec: OpenAPISpec = {
       ...testSpec,

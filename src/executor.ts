@@ -7,14 +7,14 @@ import type { ToolDefinition } from "./tool-builder.js";
  * @param args - The arguments provided by the MCP client
  * @param baseUrl - The base URL from the OpenAPI spec's servers[0].url
  * @param authHeaders - Pre-resolved authentication headers
- * @returns The response body as a string
+ * @returns The response body as a string, error flag, and HTTP status code
  */
 export async function executeToolCall(
   tool: ToolDefinition,
   args: Record<string, unknown>,
   baseUrl: string,
   authHeaders: Record<string, string>
-): Promise<{ content: string; isError: boolean }> {
+): Promise<{ content: string; isError: boolean; httpStatus?: number }> {
   // Build the URL path by substituting path parameters
   let path = tool.pathTemplate;
   for (const param of tool.pathParams) {
@@ -80,15 +80,16 @@ export async function executeToolCall(
       return {
         content: `HTTP ${response.status} ${response.statusText}\n\n${responseText}`,
         isError: true,
+        httpStatus: response.status,
       };
     }
 
     // Try to format JSON response for readability
     try {
       const json = JSON.parse(responseText);
-      return { content: JSON.stringify(json, null, 2), isError: false };
+      return { content: JSON.stringify(json, null, 2), isError: false, httpStatus: response.status };
     } catch {
-      return { content: responseText, isError: false };
+      return { content: responseText, isError: false, httpStatus: response.status };
     }
   } catch (error) {
     return {

@@ -57,6 +57,71 @@ export const SHARED_OPTIONS: OptionDef[] = [
   },
 ];
 
+/** Auth options shared by both `rest` and `graphql` commands */
+export const AUTH_OPTIONS: OptionDef[] = [
+  {
+    key: "authType",
+    cli: "--auth-type <type>",
+    env: "API2MCP_AUTH_TYPE",
+    config: "auth.type",
+    description: "Auth type: jwt-password",
+    type: "string",
+  },
+  {
+    key: "authLoginUrl",
+    cli: "--auth-login-url <url>",
+    env: "API2MCP_AUTH_LOGIN_URL",
+    config: "auth.loginUrl",
+    description: "Login endpoint URL for jwt-password auth",
+    type: "string",
+  },
+  {
+    key: "authUsernameField",
+    cli: "--auth-username-field <field>",
+    env: "API2MCP_AUTH_USERNAME_FIELD",
+    config: "auth.usernameField",
+    description: "Request body field name for username (default: username)",
+    type: "string",
+    default: "username",
+  },
+  {
+    key: "authPasswordField",
+    cli: "--auth-password-field <field>",
+    env: "API2MCP_AUTH_PASSWORD_FIELD",
+    config: "auth.passwordField",
+    description: "Request body field name for password (default: password)",
+    type: "string",
+    default: "password",
+  },
+  {
+    key: "authTokenPath",
+    cli: "--auth-token-path <path>",
+    env: "API2MCP_AUTH_TOKEN_PATH",
+    config: "auth.tokenPath",
+    description: "Path to JWT in login response: simple name (token), dot-path (data.jwt), or JSONPath ($.token) (default: token)",
+    type: "string",
+    default: "token",
+  },
+  {
+    key: "authRefreshUrl",
+    cli: "--auth-refresh-url <url>",
+    env: "API2MCP_AUTH_REFRESH_URL",
+    config: "auth.refreshUrl",
+    description: "Refresh endpoint URL (optional — default: re-login on expiry)",
+    type: "string",
+  },
+];
+
+/** Base URL override for the `rest` command (overrides spec's servers[0].url) */
+export const BASE_URL_OPTION: OptionDef = {
+  key: "baseUrl",
+  cli: "--base-url <url>",
+  env: "API2MCP_BASE_URL",
+  config: "options.baseUrl",
+  description: "Override the base URL from the spec's servers[0].url",
+  type: "string",
+};
+
 /** Spec/endpoint source: positional arg + env + config (no CLI flag) */
 export const SPEC_OPTION: OptionDef = {
   key: "spec",

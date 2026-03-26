@@ -10,7 +10,8 @@ import { startMcpServer } from "../mcp-server.js";
 import { resolveFilterOptions } from "./filter-options.js";
 import { parseBindings } from "./bind-options.js";
 import { loadConfigFile, mergeEnvWithConfig } from "../config-file.js";
-import { SPEC_OPTION, resolveOption, registerOptions, findSharedOption } from "../options-schema.js";
+import { SPEC_OPTION, BASE_URL_OPTION, SHARED_OPTIONS, AUTH_OPTIONS, resolveOption, registerOptions, findSharedOption } from "../options-schema.js";
+import { buildJwtAuth, executeWithJwtRetry, JWT_AUTH_HELP } from "./jwt-auth-options.js";
 
 const collect = (val: string, acc: string[]) => [...acc, val];
 
@@ -25,6 +26,7 @@ export function registerGraphqlCommand(program: Command): void {
     .addHelpText("after", `
 Environment variables:
   API2MCP_SPEC_URL      GraphQL endpoint URL (alternative to positional arg)
+  API2MCP_BASE_URL      Override the endpoint URL (same as --base-url)
   API2MCP_READONLY      Expose only read operations (same as --readonly)
   API2MCP_ONLY          Whitelist operations, comma-separated (same as --only)
   API2MCP_EXCLUDE       Blacklist operations, comma-separated (same as --exclude)
@@ -36,9 +38,13 @@ Examples:
   $ api-to-mcp graphql ./schema.graphql
   $ api-to-mcp graphql https://api.linear.app/graphql --readonly
   $ api-to-mcp graphql https://api.example.com/graphql --only "query_issues,query_viewer"
-  $ api-to-mcp graphql https://api.example.com/graphql --bind "teamId=TEAM_ABC"`);
+  $ api-to-mcp graphql https://api.example.com/graphql --bind "teamId=TEAM_ABC"
+  $ api-to-mcp graphql https://api.example.com/graphql --auth-type jwt-password \\
+      --auth-login-url https://api.example.com/auth/login --auth-token-path jwt${JWT_AUTH_HELP}`);
 
   registerOptions(cmd, SHARED_OPTIONS);
+  registerOptions(cmd, [BASE_URL_OPTION]);
+  registerOptions(cmd, AUTH_OPTIONS);
 
   cmd.action(async (endpointArg: string, opts: {
     header: string[];
@@ -47,9 +53,17 @@ Examples:
     exclude?: string;
     bind: string[];
     config?: string;
+    baseUrl?: string;
+    authType?: string;
+    authLoginUrl?: string;
+    authUsernameField?: string;
+    authPasswordField?: string;
+    authTokenPath?: string;
+    authRefreshUrl?: string;
   }) => {
       const configFile = loadConfigFile(opts.config);
       const endpoint = resolveOption(SPEC_OPTION, endpointArg, process.env, configFile);
+      const executionUrl = resolveOption(BASE_URL_OPTION, opts.baseUrl, process.env, configFile) ?? endpoint;
 
       if (!endpoint) {
         process.stderr.write(
@@ -65,7 +79,7 @@ Examples:
 
       // Build auth headers: config.auth.headers (lowest) < env vars < CLI flags (highest)
       const mergedEnv = mergeEnvWithConfig(process.env, configFile?.auth);
-      const authHeaders = {
+      const staticAuthHeaders = {
         ...(configFile?.auth?.headers ?? {}),
         ...resolveAuthHeaders(null, {
           cliHeaders: parseHeaderFlags(opts.header),
@@ -73,7 +87,14 @@ Examples:
         }),
       };
 
-      const schema = await loadGraphQLSchema(endpoint, authHeaders);
+      const jwtAuth = buildJwtAuth(opts, configFile, process.env);
+
+      // For schema loading, get initial JWT headers if jwt-password auth is configured
+      const schemaHeaders = jwtAuth
+        ? { ...staticAuthHeaders, ...(await jwtAuth.getHeaders()) }
+        : staticAuthHeaders;
+
+      const schema = await loadGraphQLSchema(endpoint, schemaHeaders);
       const allTools = buildGraphQLTools(schema, { readonly });
 
       // Warn if any binding key is not found in any tool
@@ -124,14 +145,18 @@ Examples:
         serverVersion: "0.1.0",
         tools,
         specSource: endpoint,
-        baseUrl: endpoint,
+        baseUrl: executionUrl,
         readonly,
         executeCall: (tool, args) =>
-          executeGraphQLCall(
-            tool as GraphQLToolDefinition,
-            { ...args, ...bindings },
-            endpoint,
-            authHeaders
+          executeWithJwtRetry(
+            (headers) => executeGraphQLCall(
+              tool as GraphQLToolDefinition,
+              { ...args, ...bindings },
+              executionUrl,
+              headers
+            ),
+            jwtAuth,
+            staticAuthHeaders
           ),
       });
     });
