@@ -65,6 +65,7 @@ export function buildJwtAuth(
 ): JwtAuthManager | null {
   const resolve = (key: string, cliVal: unknown) => {
     const def = AUTH_OPTIONS.find((d) => d.key === key);
+    /* v8 ignore next */
     if (!def) throw new Error(`Internal: auth option '${key}' not found in AUTH_OPTIONS`);
     return resolveOption(def, cliVal, env, configFile);
   };
@@ -95,9 +96,9 @@ export function buildJwtAuth(
 
   return new JwtAuthManager({
     loginUrl,
-    usernameField: resolve("authUsernameField", opts.authUsernameField) ?? "username",
-    passwordField: resolve("authPasswordField", opts.authPasswordField) ?? "password",
-    tokenPath: resolve("authTokenPath", opts.authTokenPath) ?? "token",
+    usernameField: resolve("authUsernameField", opts.authUsernameField) as string,
+    passwordField: resolve("authPasswordField", opts.authPasswordField) as string,
+    tokenPath: resolve("authTokenPath", opts.authTokenPath) as string,
     refreshUrl: resolve("authRefreshUrl", opts.authRefreshUrl),
     username,
     password,
