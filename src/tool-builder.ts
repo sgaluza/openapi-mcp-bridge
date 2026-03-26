@@ -98,6 +98,39 @@ export interface FilterToolsOptions {
 const READONLY_METHODS = new Set(["GET", "HEAD"]);
 
 /**
+ * Collect tool description overrides from environment variables prefixed with API2MCP_OVERRIDE_.
+ * The tool name is derived by stripping the prefix: API2MCP_OVERRIDE_getFoo → { getFoo: "..." }.
+ */
+export function collectEnvOverrides(env: Record<string, string | undefined>): Record<string, string> {
+  const prefix = "API2MCP_OVERRIDE_";
+  const result: Record<string, string> = {};
+  for (const [key, val] of Object.entries(env)) {
+    if (key.startsWith(prefix) && val) {
+      result[key.slice(prefix.length)] = val;
+    }
+  }
+  return result;
+}
+
+/**
+ * Override tool descriptions from a name→description map.
+ * Only the description field is replaced; all other tool properties are preserved.
+ * Returns the original array unchanged when overrides is empty (performance optimisation).
+ */
+export function applyOverrides(
+  tools: ToolDefinition[],
+  overrides: Record<string, string>
+): ToolDefinition[] {
+  if (Object.keys(overrides).length === 0) return tools;
+
+  return tools.map((tool) =>
+    tool.name in overrides
+      ? { ...tool, description: overrides[tool.name] }
+      : tool
+  );
+}
+
+/**
  * Remove pre-bound parameters from tool input schemas.
  * Bound params are hidden from the MCP client — the bridge injects their
  * values automatically at call time via the bindings map.

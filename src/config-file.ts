@@ -3,6 +3,7 @@ import { parse } from "yaml";
 
 export interface ConfigFile {
   spec?: string;
+  overrides?: Record<string, string>;
   auth?: {
     token?: string;
     bearer?: string;
@@ -41,7 +42,7 @@ export function mergeEnvWithConfig(env: Record<string, string | undefined>, auth
   };
 }
 
-const KNOWN_KEYS = new Set(["spec", "auth", "options"]);
+const KNOWN_KEYS = new Set(["spec", "auth", "options", "overrides"]);
 const KNOWN_AUTH_KEYS = new Set(["token", "bearer", "apiKey", "headers", "type", "loginUrl", "usernameField", "passwordField", "tokenPath", "refreshUrl"]);
 const KNOWN_OPTIONS_KEYS = new Set(["readonly", "only", "exclude", "bind", "baseUrl"]);
 
@@ -66,6 +67,17 @@ function parseConfigFile(path: string): ConfigFile {
           if (typeof value !== "string") {
             process.stderr.write(`Warning: auth.headers.${key} must be a string, got ${typeof value} in ${path}\n`);
           }
+        }
+      }
+    }
+  }
+  if (parsed.overrides !== undefined) {
+    if (typeof parsed.overrides !== "object" || Array.isArray(parsed.overrides)) {
+      process.stderr.write(`Warning: overrides must be an object in ${path}\n`);
+    } else {
+      for (const [key, value] of Object.entries(parsed.overrides)) {
+        if (typeof value !== "string") {
+          process.stderr.write(`Warning: overrides.${key} must be a string, got ${typeof value} in ${path}\n`);
         }
       }
     }

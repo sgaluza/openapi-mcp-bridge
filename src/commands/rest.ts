@@ -1,7 +1,7 @@
 import type { Command } from "commander";
 import chalk from "chalk";
 import { loadSpec } from "../spec-loader.js";
-import { buildTools, filterTools, applyBindings } from "../tool-builder.js";
+import { buildTools, filterTools, applyBindings, applyOverrides, collectEnvOverrides } from "../tool-builder.js";
 import { executeToolCall, resolveBaseUrl } from "../executor.js";
 import { resolveAuthHeaders, parseHeaderFlags } from "../auth.js";
 import { startMcpServer } from "../mcp-server.js";
@@ -97,6 +97,10 @@ Examples:
       const { only, exclude } = resolveFilterOptions(mergedOpts, bound);
       const tools = filterTools(bound, { readonly, only, exclude });
 
+      const envOverrides = collectEnvOverrides(process.env);
+      const overrides = { ...(configFile?.overrides ?? {}), ...envOverrides };
+      const finalTools = applyOverrides(tools, overrides);
+
       if (tools.length === 0) {
         const applied = [
           readonly && "readonly",
@@ -128,7 +132,7 @@ Examples:
       await startMcpServer({
         serverName,
         serverVersion,
-        tools,
+        tools: finalTools,
         specSource,
         baseUrl,
         readonly,
