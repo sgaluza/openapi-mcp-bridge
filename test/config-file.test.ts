@@ -281,9 +281,14 @@ auth:
   it("filters out non-string override values, keeps valid ones", () => {
     const filePath = join(tmpDir, "mixed-overrides.yml");
     writeFileSync(filePath, "overrides:\n  getFoo: valid desc\n  getBar: 42\n");
+    const orig = process.stderr.write.bind(process.stderr);
     process.stderr.write = () => true;
-    const config = loadConfigFile(filePath);
-    expect(config?.overrides).toEqual({ getFoo: "valid desc" });
+    try {
+      const config = loadConfigFile(filePath);
+      expect(config?.overrides).toEqual({ getFoo: "valid desc" });
+    } finally {
+      process.stderr.write = orig;
+    }
   });
 
   it("prefers api-to-mcp.yml over api-to-mcp.yaml and api-to-mcp.json when multiple exist", () => {
