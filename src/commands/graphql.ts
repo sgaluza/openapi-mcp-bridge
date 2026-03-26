@@ -10,7 +10,7 @@ import { startMcpServer } from "../mcp-server.js";
 import { resolveFilterOptions } from "./filter-options.js";
 import { parseBindings } from "./bind-options.js";
 import { loadConfigFile, mergeEnvWithConfig } from "../config-file.js";
-import { SPEC_OPTION, SHARED_OPTIONS, AUTH_OPTIONS, resolveOption, registerOptions, findSharedOption } from "../options-schema.js";
+import { SPEC_OPTION, BASE_URL_OPTION, SHARED_OPTIONS, AUTH_OPTIONS, resolveOption, registerOptions, findSharedOption } from "../options-schema.js";
 import { buildJwtAuth, executeWithJwtRetry, JWT_AUTH_HELP } from "./jwt-auth-options.js";
 
 const collect = (val: string, acc: string[]) => [...acc, val];
@@ -26,6 +26,7 @@ export function registerGraphqlCommand(program: Command): void {
     .addHelpText("after", `
 Environment variables:
   API2MCP_SPEC_URL      GraphQL endpoint URL (alternative to positional arg)
+  API2MCP_BASE_URL      Override the endpoint URL (same as --base-url)
   API2MCP_READONLY      Expose only read operations (same as --readonly)
   API2MCP_ONLY          Whitelist operations, comma-separated (same as --only)
   API2MCP_EXCLUDE       Blacklist operations, comma-separated (same as --exclude)
@@ -42,6 +43,7 @@ Examples:
       --auth-login-url https://api.example.com/auth/login --auth-token-path jwt${JWT_AUTH_HELP}`);
 
   registerOptions(cmd, SHARED_OPTIONS);
+  registerOptions(cmd, [BASE_URL_OPTION]);
   registerOptions(cmd, AUTH_OPTIONS);
 
   cmd.action(async (endpointArg: string, opts: {
@@ -51,6 +53,7 @@ Examples:
     exclude?: string;
     bind: string[];
     config?: string;
+    baseUrl?: string;
     authType?: string;
     authLoginUrl?: string;
     authUsernameField?: string;
@@ -60,6 +63,7 @@ Examples:
   }) => {
       const configFile = loadConfigFile(opts.config);
       const endpoint = resolveOption(SPEC_OPTION, endpointArg, process.env, configFile);
+      const executionUrl = resolveOption(BASE_URL_OPTION, opts.baseUrl, process.env, configFile) ?? endpoint;
 
       if (!endpoint) {
         process.stderr.write(
@@ -141,14 +145,14 @@ Examples:
         serverVersion: "0.1.0",
         tools,
         specSource: endpoint,
-        baseUrl: endpoint,
+        baseUrl: executionUrl,
         readonly,
         executeCall: (tool, args) =>
           executeWithJwtRetry(
             (headers) => executeGraphQLCall(
               tool as GraphQLToolDefinition,
               { ...args, ...bindings },
-              endpoint,
+              executionUrl,
               headers
             ),
             jwtAuth,
