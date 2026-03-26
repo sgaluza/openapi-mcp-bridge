@@ -164,6 +164,8 @@ export function filterTools(
  */
 export function buildTools(spec: OpenAPISpec): ToolDefinition[] {
   const tools: ToolDefinition[] = [];
+  // Shared cache so each $ref component schema is resolved only once across all operations
+  const schemaCache = new Map<string, JSONSchema>();
 
   for (const [path, methods] of Object.entries(spec.paths)) {
     // Skip path-level parameters and other non-method keys
@@ -196,7 +198,7 @@ export function buildTools(spec: OpenAPISpec): ToolDefinition[] {
 
           if (param.in === "path" || param.in === "query") {
             const schema = param.schema
-              ? resolveSchemaRefs(spec, param.schema)
+              ? resolveSchemaRefs(spec, param.schema, schemaCache)
               : { type: "string" };
 
             properties[param.name] = {
@@ -226,7 +228,7 @@ export function buildTools(spec: OpenAPISpec): ToolDefinition[] {
           content?.["application/json"] || content?.["*/*"];
 
         if (jsonContent?.schema) {
-          const bodySchema = resolveSchemaRefs(spec, jsonContent.schema);
+          const bodySchema = resolveSchemaRefs(spec, jsonContent.schema, schemaCache);
           properties["body"] = {
             ...bodySchema,
             ...(body.description ? { description: body.description } : {}),

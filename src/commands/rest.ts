@@ -8,7 +8,7 @@ import { startMcpServer } from "../mcp-server.js";
 import { resolveFilterOptions } from "./filter-options.js";
 import { parseBindings } from "./bind-options.js";
 import { loadConfigFile, mergeEnvWithConfig } from "../config-file.js";
-import { SPEC_OPTION, SHARED_OPTIONS, AUTH_OPTIONS, resolveOption, registerOptions, findSharedOption } from "../options-schema.js";
+import { SPEC_OPTION, BASE_URL_OPTION, SHARED_OPTIONS, AUTH_OPTIONS, resolveOption, registerOptions, findSharedOption } from "../options-schema.js";
 import { buildJwtAuth, executeWithJwtRetry, JWT_AUTH_HELP } from "./jwt-auth-options.js";
 
 const collect = (val: string, acc: string[]) => [...acc, val];
@@ -24,6 +24,7 @@ export function registerRestCommand(program: Command): void {
     .addHelpText("after", `
 Environment variables:
   API2MCP_SPEC_URL      OpenAPI spec URL or path (alternative to positional arg)
+  API2MCP_BASE_URL      Override base URL from spec's servers[0].url (same as --base-url)
   API2MCP_READONLY      Expose only read operations (same as --readonly)
   API2MCP_ONLY          Whitelist operations, comma-separated (same as --only)
   API2MCP_EXCLUDE       Blacklist operations, comma-separated (same as --exclude)
@@ -45,6 +46,7 @@ Examples:
       --auth-username-field userName --auth-token-path jwt${JWT_AUTH_HELP}`);
 
   registerOptions(cmd, SHARED_OPTIONS);
+  registerOptions(cmd, [BASE_URL_OPTION]);
   registerOptions(cmd, AUTH_OPTIONS);
 
   cmd.action(async (specArg: string | undefined, opts: {
@@ -54,6 +56,7 @@ Examples:
     exclude?: string;
     bind: string[];
     config?: string;
+    baseUrl?: string;
     authType?: string;
     authLoginUrl?: string;
     authUsernameField?: string;
@@ -108,7 +111,9 @@ Examples:
         process.exit(1);
       }
 
-      const baseUrl = resolveBaseUrl(spec.servers?.[0]?.url, specSource);
+      const baseUrl =
+        resolveOption(BASE_URL_OPTION, opts.baseUrl, process.env, configFile) ??
+        resolveBaseUrl(spec.servers?.[0]?.url, specSource);
       const mergedEnv = mergeEnvWithConfig(process.env, configFile?.auth);
       const staticAuthHeaders = {
         ...(configFile?.auth?.headers ?? {}),

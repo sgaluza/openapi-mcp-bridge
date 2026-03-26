@@ -112,6 +112,16 @@ export const AUTH_OPTIONS: OptionDef[] = [
   },
 ];
 
+/** Base URL override for the `rest` command (overrides spec's servers[0].url) */
+export const BASE_URL_OPTION: OptionDef = {
+  key: "baseUrl",
+  cli: "--base-url <url>",
+  env: "API2MCP_BASE_URL",
+  config: "options.baseUrl",
+  description: "Override the base URL from the spec's servers[0].url",
+  type: "string",
+};
+
 /** Spec/endpoint source: positional arg + env + config (no CLI flag) */
 export const SPEC_OPTION: OptionDef = {
   key: "spec",

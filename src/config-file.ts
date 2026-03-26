@@ -16,7 +16,7 @@ export interface ConfigFile {
     tokenPath?: string;
     refreshUrl?: string;
   };
-  options?: { readonly?: boolean; only?: string[]; exclude?: string[]; bind?: Record<string, string>; };
+  options?: { readonly?: boolean; only?: string[]; exclude?: string[]; bind?: Record<string, string>; baseUrl?: string; };
 }
 
 const CONFIG_CANDIDATES = ["api-to-mcp.yml", "api-to-mcp.yaml", "api-to-mcp.json"];
@@ -43,7 +43,7 @@ export function mergeEnvWithConfig(env: Record<string, string | undefined>, auth
 
 const KNOWN_KEYS = new Set(["spec", "auth", "options"]);
 const KNOWN_AUTH_KEYS = new Set(["token", "bearer", "apiKey", "headers", "type", "loginUrl", "usernameField", "passwordField", "tokenPath", "refreshUrl"]);
-const KNOWN_OPTIONS_KEYS = new Set(["readonly", "only", "exclude", "bind"]);
+const KNOWN_OPTIONS_KEYS = new Set(["readonly", "only", "exclude", "bind", "baseUrl"]);
 
 function parseConfigFile(path: string): ConfigFile {
   const content = readFileSync(path, "utf8");
