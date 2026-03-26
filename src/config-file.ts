@@ -72,7 +72,7 @@ function parseConfigFile(path: string): ConfigFile {
     }
   }
   if (parsed.overrides !== undefined) {
-    if (typeof parsed.overrides !== "object" || Array.isArray(parsed.overrides)) {
+    if (parsed.overrides === null || typeof parsed.overrides !== "object" || Array.isArray(parsed.overrides)) {
       process.stderr.write(`Warning: overrides must be an object in ${path}\n`);
       parsed.overrides = undefined;
     } else {

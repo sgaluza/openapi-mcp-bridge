@@ -258,6 +258,21 @@ auth:
     expect(stderrWrites.some((w) => w.includes("overrides.getFoo must be a string"))).toBe(true);
   });
 
+  it("handles overrides: null gracefully", () => {
+    const filePath = join(tmpDir, "null-overrides.yml");
+    writeFileSync(filePath, "overrides: null\n");
+    const stderrWrites: string[] = [];
+    const orig = process.stderr.write.bind(process.stderr);
+    process.stderr.write = (chunk: unknown) => { stderrWrites.push(String(chunk)); return true; };
+    try {
+      const config = loadConfigFile(filePath);
+      expect(config?.overrides).toBeUndefined();
+      expect(stderrWrites.some((w) => w.includes("overrides must be an object"))).toBe(true);
+    } finally {
+      process.stderr.write = orig;
+    }
+  });
+
   it("drops overrides entirely when value is not an object", () => {
     const filePath = join(tmpDir, "bad-overrides-array.yml");
     writeFileSync(filePath, "overrides:\n  - getFoo: desc\n");
