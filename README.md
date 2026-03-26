@@ -35,6 +35,8 @@ OpenAPI spec / GraphQL schema
 - [Quick start](#quick-start)
 - [OpenAPI / REST](#openapi--rest)
   - [Authentication](#authentication)
+  - [JWT password authentication](#jwt-password-authentication)
+  - [Base URL override](#base-url-override)
   - [Config file](#config-file)
   - [Filtering tools](#filtering-tools)
   - [Pre-binding parameters](#pre-binding-parameters)
@@ -107,6 +109,96 @@ API2MCP_AUTH_TOKEN=lin_api_xxx npx @sgaluza/api-to-mcp rest ./openapi.yaml
 
 ---
 
+### JWT password authentication
+
+Some APIs authenticate with a username/password login endpoint that returns a short-lived JWT. `api-to-mcp` handles the full token lifecycle automatically:
+
+- **Lazy login** — token is fetched on the first request, not at startup
+- **Auto-refresh** — token is proactively refreshed 5 minutes before expiry
+- **401 retry** — if the server returns 401, the token is force-refreshed and the request is retried once
+- **Deduplication** — concurrent requests share a single in-flight login call
+
+```bash
+npx @sgaluza/api-to-mcp rest https://api.example.com/openapi.yaml \
+  --auth-type jwt-password \
+  --auth-login-url https://api.example.com/auth/login \
+  --auth-username-field userName \
+  --auth-password-field password \
+  --auth-token-path jwt \
+  --auth-refresh-url https://api.example.com/auth/refresh-token
+```
+
+| Flag | Env variable | Default | Description |
+|------|-------------|---------|-------------|
+| `--auth-type jwt-password` | `API2MCP_AUTH_TYPE` | — | Enable JWT password auth |
+| `--auth-login-url <url>` | `API2MCP_AUTH_LOGIN_URL` | — | Login endpoint (POST) |
+| `--auth-username-field <field>` | `API2MCP_AUTH_USERNAME_FIELD` | `username` | Request body field for username |
+| `--auth-password-field <field>` | `API2MCP_AUTH_PASSWORD_FIELD` | `password` | Request body field for password |
+| `--auth-token-path <path>` | `API2MCP_AUTH_TOKEN_PATH` | `token` | Path to JWT in login response: simple (`jwt`), dot-path (`data.token`), or JSONPath (`$.response.jwt`) |
+| `--auth-refresh-url <url>` | `API2MCP_AUTH_REFRESH_URL` | — | Optional token refresh endpoint (GET) |
+
+Credentials are passed via environment variables (never as CLI flags):
+
+```bash
+API2MCP_USERNAME=alice API2MCP_PASSWORD=s3cret \
+  npx @sgaluza/api-to-mcp rest https://api.example.com/openapi.yaml \
+  --auth-type jwt-password \
+  --auth-login-url https://api.example.com/auth/login
+```
+
+**Config file:**
+
+```yaml
+auth:
+  type: jwt-password
+  loginUrl: https://api.example.com/auth/login
+  usernameField: userName       # default: username
+  passwordField: password       # default: password
+  tokenPath: jwt                # default: token
+  refreshUrl: https://api.example.com/auth/refresh-token
+```
+
+**MCP client config** (credentials injected via `env`):
+
+```json
+{
+  "mcpServers": {
+    "my-api": {
+      "command": "npx",
+      "args": [
+        "-y", "@sgaluza/api-to-mcp", "rest",
+        "https://api.example.com/openapi.yaml",
+        "--auth-type", "jwt-password",
+        "--auth-login-url", "https://api.example.com/auth/login",
+        "--auth-username-field", "userName",
+        "--auth-token-path", "jwt"
+      ],
+      "env": {
+        "API2MCP_USERNAME": "alice",
+        "API2MCP_PASSWORD": "s3cret"
+      }
+    }
+  }
+}
+```
+
+---
+
+### Base URL override
+
+Override the base URL extracted from `servers[0].url` in the spec. Useful when the spec is hosted on a different domain than the API (e.g. staging spec + production API):
+
+```bash
+npx @sgaluza/api-to-mcp rest https://staging.example.com/openapi.json \
+  --base-url https://api.example.com
+```
+
+| Flag | Env variable | Config key | Description |
+|------|-------------|------------|-------------|
+| `--base-url <url>` | `API2MCP_BASE_URL` | `options.baseUrl` | Override base URL from spec's `servers[0].url` |
+
+---
+
 ### Config file
 
 Store your spec URL, auth, and options in a file instead of passing flags every time.
@@ -128,6 +220,7 @@ auth:
 
 options:
   readonly: true             # only GET/HEAD operations
+  baseUrl: https://api.example.com  # override spec's servers[0].url
   only:
     - getIssue
     - listIssues
@@ -199,9 +292,18 @@ Warning: --bind key 'temId' not found in any tool. Check for typos.
 | Variable | Description |
 |----------|-------------|
 | `API2MCP_SPEC_URL` | OpenAPI spec URL or file path (alternative to positional argument) |
+| `API2MCP_BASE_URL` | Override base URL from spec's `servers[0].url` |
 | `API2MCP_BEARER_TOKEN` | Bearer token → `Authorization: Bearer <token>` |
 | `API2MCP_API_KEY` | API key → header name from `securitySchemes` |
 | `API2MCP_AUTH_TOKEN` | Raw `Authorization` header value |
+| `API2MCP_AUTH_TYPE` | Auth type — currently supports `jwt-password` |
+| `API2MCP_AUTH_LOGIN_URL` | JWT login endpoint URL |
+| `API2MCP_USERNAME` | Username for JWT password auth |
+| `API2MCP_PASSWORD` | Password for JWT password auth |
+| `API2MCP_AUTH_USERNAME_FIELD` | Request body field for username (default: `username`) |
+| `API2MCP_AUTH_PASSWORD_FIELD` | Request body field for password (default: `password`) |
+| `API2MCP_AUTH_TOKEN_PATH` | Path to JWT in login response (default: `token`) |
+| `API2MCP_AUTH_REFRESH_URL` | JWT refresh endpoint URL |
 
 ---
 

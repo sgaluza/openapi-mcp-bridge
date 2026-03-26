@@ -32,6 +32,7 @@ auth:
 
 options:
   readonly: true                  # only GET/HEAD operations
+  baseUrl: https://api.example.com  # override spec's servers[0].url
   only:
     - getIssue
     - listIssues

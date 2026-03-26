@@ -32,7 +32,7 @@ Every `operationId` in your spec becomes an MCP tool name. If an operation has n
 | Path params `{id}` | Required input parameters |
 | Query params | Optional input parameters |
 | `requestBody` (application/json) | `body` parameter |
-| `servers[0].url` | Base URL for all requests |
+| `servers[0].url` | Base URL for all requests (overridable via `--base-url`) |
 
 ## Request execution
 
@@ -49,11 +49,16 @@ When an AI calls a tool, the bridge:
 ```
 Options:
   -H, --header <header>       Add a request header (repeatable)
+  --base-url <url>            Override base URL from spec's servers[0].url
   --readonly                  Expose only GET and HEAD operations
   --only <operations>         Whitelist operations by name (comma-separated)
   --exclude <operations>      Blacklist operations by name (comma-separated)
   --bind <binding>            Pre-bind a parameter: key=value (repeatable)
   --config <path>             Path to config file (default: auto-discover)
+  --auth-type <type>          Auth type (jwt-password)
+  --auth-login-url <url>      JWT login endpoint URL
+  --auth-token-path <path>    Path to JWT in login response (default: token)
+  --auth-refresh-url <url>    JWT refresh endpoint URL
   -h, --help                  Show help
 ```
 
