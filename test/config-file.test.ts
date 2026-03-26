@@ -238,14 +238,19 @@ auth:
     });
   });
 
-  it("warns when overrides is an array instead of object", () => {
+  it("warns and drops overrides when value is an array instead of object", () => {
     const filePath = join(tmpDir, "bad-overrides.yml");
     writeFileSync(filePath, "overrides:\n  - getFoo: desc\n");
     const stderrWrites: string[] = [];
     const orig = process.stderr.write.bind(process.stderr);
     process.stderr.write = (chunk: unknown) => { stderrWrites.push(String(chunk)); return true; };
-    try { loadConfigFile(filePath); } finally { process.stderr.write = orig; }
-    expect(stderrWrites.some((w) => w.includes("overrides must be an object"))).toBe(true);
+    try {
+      const config = loadConfigFile(filePath);
+      expect(config?.overrides).toBeUndefined();
+      expect(stderrWrites.some((w) => w.includes("overrides must be an object"))).toBe(true);
+    } finally {
+      process.stderr.write = orig;
+    }
   });
 
   it("warns when an override value is not a string", () => {
@@ -271,14 +276,6 @@ auth:
     } finally {
       process.stderr.write = orig;
     }
-  });
-
-  it("drops overrides entirely when value is not an object", () => {
-    const filePath = join(tmpDir, "bad-overrides-array.yml");
-    writeFileSync(filePath, "overrides:\n  - getFoo: desc\n");
-    process.stderr.write = () => true;
-    const config = loadConfigFile(filePath);
-    expect(config?.overrides).toBeUndefined();
   });
 
   it("filters out non-string override values, keeps valid ones", () => {
