@@ -260,6 +260,29 @@ npx @sgaluza/api-to-mcp rest ./openapi.yaml \
 
 ---
 
+### Overriding tool descriptions
+
+Sometimes an OpenAPI spec has poor or missing descriptions on generated tools (e.g. undocumented enum values, ambiguous parameter names). You can override any tool's description without modifying the spec.
+
+**Config file:**
+
+```yaml
+# api-to-mcp.yml
+overrides:
+  post_api_quote_items: "Get paginated quotes. IMPORTANT: sorter.property must be PascalCase (Created, Number, Client, Status), sorter.direction must be Asc or Desc."
+  getUser: "Fetch a single user by ID."
+```
+
+**Environment variable** (takes priority over config file):
+
+```bash
+API2MCP_OVERRIDE_post_api_quote_items="Get paginated quotes. IMPORTANT: sorter.property must be PascalCase..."
+```
+
+Only the `description` field is replaced — the tool name, input schema, and all other properties remain unchanged.
+
+---
+
 ### Pre-binding parameters
 
 Pre-bind a path or query parameter to a fixed value with `--bind key=value`. The parameter is removed from the MCP tool's input schema — the bridge injects it automatically on every call.
@@ -304,6 +327,7 @@ Warning: --bind key 'temId' not found in any tool. Check for typos.
 | `API2MCP_AUTH_PASSWORD_FIELD` | Request body field for password (default: `password`) |
 | `API2MCP_AUTH_TOKEN_PATH` | Path to JWT in login response (default: `token`) |
 | `API2MCP_AUTH_REFRESH_URL` | JWT refresh endpoint URL |
+| `API2MCP_OVERRIDE_<toolName>` | Override description for a specific tool (e.g. `API2MCP_OVERRIDE_getFoo="Custom description"`) |
 
 ---
 

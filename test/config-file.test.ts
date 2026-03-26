@@ -222,6 +222,75 @@ auth:
     expect(stderrWrites.some((w) => w.includes("auth.headers.X-Enabled must be a string"))).toBe(true);
   });
 
+  it("parses overrides as a Record<string, string>", () => {
+    const filePath = join(tmpDir, "overrides-config.yml");
+    writeFileSync(
+      filePath,
+      `overrides:
+  getFoo: "Custom description for getFoo"
+  getBar: "Custom description for getBar"
+`
+    );
+    const config = loadConfigFile(filePath);
+    expect(config?.overrides).toEqual({
+      getFoo: "Custom description for getFoo",
+      getBar: "Custom description for getBar",
+    });
+  });
+
+  it("warns and drops overrides when value is an array instead of object", () => {
+    const filePath = join(tmpDir, "bad-overrides.yml");
+    writeFileSync(filePath, "overrides:\n  - getFoo: desc\n");
+    const stderrWrites: string[] = [];
+    const orig = process.stderr.write.bind(process.stderr);
+    process.stderr.write = (chunk: unknown) => { stderrWrites.push(String(chunk)); return true; };
+    try {
+      const config = loadConfigFile(filePath);
+      expect(config?.overrides).toBeUndefined();
+      expect(stderrWrites.some((w) => w.includes("overrides must be an object"))).toBe(true);
+    } finally {
+      process.stderr.write = orig;
+    }
+  });
+
+  it("warns when an override value is not a string", () => {
+    const filePath = join(tmpDir, "bad-override-value.yml");
+    writeFileSync(filePath, "overrides:\n  getFoo: 42\n");
+    const stderrWrites: string[] = [];
+    const orig = process.stderr.write.bind(process.stderr);
+    process.stderr.write = (chunk: unknown) => { stderrWrites.push(String(chunk)); return true; };
+    try { loadConfigFile(filePath); } finally { process.stderr.write = orig; }
+    expect(stderrWrites.some((w) => w.includes("overrides.getFoo must be a string"))).toBe(true);
+  });
+
+  it("handles overrides: null gracefully", () => {
+    const filePath = join(tmpDir, "null-overrides.yml");
+    writeFileSync(filePath, "overrides: null\n");
+    const stderrWrites: string[] = [];
+    const orig = process.stderr.write.bind(process.stderr);
+    process.stderr.write = (chunk: unknown) => { stderrWrites.push(String(chunk)); return true; };
+    try {
+      const config = loadConfigFile(filePath);
+      expect(config?.overrides).toBeUndefined();
+      expect(stderrWrites.some((w) => w.includes("overrides must be an object"))).toBe(true);
+    } finally {
+      process.stderr.write = orig;
+    }
+  });
+
+  it("filters out non-string override values, keeps valid ones", () => {
+    const filePath = join(tmpDir, "mixed-overrides.yml");
+    writeFileSync(filePath, "overrides:\n  getFoo: valid desc\n  getBar: 42\n");
+    const orig = process.stderr.write.bind(process.stderr);
+    process.stderr.write = () => true;
+    try {
+      const config = loadConfigFile(filePath);
+      expect(config?.overrides).toEqual({ getFoo: "valid desc" });
+    } finally {
+      process.stderr.write = orig;
+    }
+  });
+
   it("prefers api-to-mcp.yml over api-to-mcp.yaml and api-to-mcp.json when multiple exist", () => {
     writeFileSync(join(tmpDir, "api-to-mcp.yml"), "spec: from-yml\n");
     writeFileSync(join(tmpDir, "api-to-mcp.yaml"), "spec: from-yaml\n");

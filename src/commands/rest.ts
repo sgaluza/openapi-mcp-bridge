@@ -1,7 +1,7 @@
 import type { Command } from "commander";
 import chalk from "chalk";
 import { loadSpec } from "../spec-loader.js";
-import { buildTools, filterTools, applyBindings } from "../tool-builder.js";
+import { buildTools, filterTools, applyBindings, applyOverrides, collectEnvOverrides } from "../tool-builder.js";
 import { executeToolCall, resolveBaseUrl } from "../executor.js";
 import { resolveAuthHeaders, parseHeaderFlags } from "../auth.js";
 import { startMcpServer } from "../mcp-server.js";
@@ -30,6 +30,7 @@ Environment variables:
   API2MCP_EXCLUDE       Blacklist operations, comma-separated (same as --exclude)
   API2MCP_API_KEY       API key (uses securitySchemes from spec to determine header)
   API2MCP_BEARER_TOKEN  Bearer token (adds Authorization: Bearer header)
+  API2MCP_OVERRIDE_<toolName>  Override description for a specific tool (e.g. API2MCP_OVERRIDE_getFoo="Custom description")
 
   Legacy aliases: OPENAPI_SPEC_URL, OPENAPI_API_KEY, OPENAPI_BEARER_TOKEN
 
@@ -97,7 +98,11 @@ Examples:
       const { only, exclude } = resolveFilterOptions(mergedOpts, bound);
       const tools = filterTools(bound, { readonly, only, exclude });
 
-      if (tools.length === 0) {
+      const envOverrides = collectEnvOverrides(process.env);
+      const overrides = { ...(configFile?.overrides ?? {}), ...envOverrides };
+      const finalTools = applyOverrides(tools, overrides);
+
+      if (finalTools.length === 0) {
         const applied = [
           readonly && "readonly",
           mergedOpts.only && `only=${mergedOpts.only}`,
@@ -128,7 +133,7 @@ Examples:
       await startMcpServer({
         serverName,
         serverVersion,
-        tools,
+        tools: finalTools,
         specSource,
         baseUrl,
         readonly,
