@@ -258,6 +258,22 @@ auth:
     expect(stderrWrites.some((w) => w.includes("overrides.getFoo must be a string"))).toBe(true);
   });
 
+  it("drops overrides entirely when value is not an object", () => {
+    const filePath = join(tmpDir, "bad-overrides-array.yml");
+    writeFileSync(filePath, "overrides:\n  - getFoo: desc\n");
+    process.stderr.write = () => true;
+    const config = loadConfigFile(filePath);
+    expect(config?.overrides).toBeUndefined();
+  });
+
+  it("filters out non-string override values, keeps valid ones", () => {
+    const filePath = join(tmpDir, "mixed-overrides.yml");
+    writeFileSync(filePath, "overrides:\n  getFoo: valid desc\n  getBar: 42\n");
+    process.stderr.write = () => true;
+    const config = loadConfigFile(filePath);
+    expect(config?.overrides).toEqual({ getFoo: "valid desc" });
+  });
+
   it("prefers api-to-mcp.yml over api-to-mcp.yaml and api-to-mcp.json when multiple exist", () => {
     writeFileSync(join(tmpDir, "api-to-mcp.yml"), "spec: from-yml\n");
     writeFileSync(join(tmpDir, "api-to-mcp.yaml"), "spec: from-yaml\n");

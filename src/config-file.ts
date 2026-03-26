@@ -74,12 +74,17 @@ function parseConfigFile(path: string): ConfigFile {
   if (parsed.overrides !== undefined) {
     if (typeof parsed.overrides !== "object" || Array.isArray(parsed.overrides)) {
       process.stderr.write(`Warning: overrides must be an object in ${path}\n`);
+      parsed.overrides = undefined;
     } else {
+      const cleaned: Record<string, string> = {};
       for (const [key, value] of Object.entries(parsed.overrides)) {
         if (typeof value !== "string") {
           process.stderr.write(`Warning: overrides.${key} must be a string, got ${typeof value} in ${path}\n`);
+        } else {
+          cleaned[key] = value;
         }
       }
+      parsed.overrides = Object.keys(cleaned).length > 0 ? cleaned : undefined;
     }
   }
   if (parsed.options && typeof parsed.options === "object") {
