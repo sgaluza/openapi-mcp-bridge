@@ -3,7 +3,19 @@ import { parse } from "yaml";
 
 export interface ConfigFile {
   spec?: string;
-  auth?: { token?: string; bearer?: string; apiKey?: string; headers?: Record<string, string>; };
+  auth?: {
+    token?: string;
+    bearer?: string;
+    apiKey?: string;
+    headers?: Record<string, string>;
+    /** JWT password auth */
+    type?: string;
+    loginUrl?: string;
+    usernameField?: string;
+    passwordField?: string;
+    tokenPath?: string;
+    refreshUrl?: string;
+  };
   options?: { readonly?: boolean; only?: string[]; exclude?: string[]; bind?: Record<string, string>; };
 }
 
@@ -30,7 +42,7 @@ export function mergeEnvWithConfig(env: Record<string, string | undefined>, auth
 }
 
 const KNOWN_KEYS = new Set(["spec", "auth", "options"]);
-const KNOWN_AUTH_KEYS = new Set(["token", "bearer", "apiKey", "headers"]);
+const KNOWN_AUTH_KEYS = new Set(["token", "bearer", "apiKey", "headers", "type", "loginUrl", "usernameField", "passwordField", "tokenPath", "refreshUrl"]);
 const KNOWN_OPTIONS_KEYS = new Set(["readonly", "only", "exclude", "bind"]);
 
 function parseConfigFile(path: string): ConfigFile {
