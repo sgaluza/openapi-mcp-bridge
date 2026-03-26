@@ -163,7 +163,7 @@ JWT password auth env vars:
             headers
           );
           // On 401, force-refresh JWT and retry once
-          if (result.isError && result.content.startsWith("HTTP 401") && jwtAuth) {
+          if (result.isError && result.httpStatus === 401 && jwtAuth) {
             const freshHeaders = await jwtAuth.getHeaders(true);
             return executeGraphQLCall(
               tool as GraphQLToolDefinition,

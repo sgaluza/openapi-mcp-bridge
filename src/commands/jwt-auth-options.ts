@@ -22,8 +22,11 @@ export function buildJwtAuth(
   configFile: ConfigFile | null,
   env: Record<string, string | undefined>
 ): JwtAuthManager | null {
-  const resolve = (key: string, cliVal: unknown) =>
-    resolveOption(AUTH_OPTIONS.find((d) => d.key === key)!, cliVal, env, configFile);
+  const resolve = (key: string, cliVal: unknown) => {
+    const def = AUTH_OPTIONS.find((d) => d.key === key);
+    if (!def) throw new Error(`Internal: auth option '${key}' not found in AUTH_OPTIONS`);
+    return resolveOption(def, cliVal, env, configFile);
+  };
 
   const authType = resolve("authType", opts.authType);
   if (authType !== "jwt-password") return null;

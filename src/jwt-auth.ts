@@ -117,7 +117,7 @@ export class JwtAuthManager {
   private async callLogin(): Promise<string> {
     const { loginUrl, usernameField, passwordField, username, password, tokenPath } = this.config;
 
-    const res = await fetch(loginUrl, {
+    const res = await fetchWithTimeout(loginUrl, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ [usernameField]: username, [passwordField]: password }),
@@ -132,9 +132,12 @@ export class JwtAuthManager {
   }
 
   private async callRefresh(): Promise<string> {
-    const { refreshUrl, tokenPath } = this.config;
+    const { tokenPath } = this.config;
+    const refreshUrl = this.config.refreshUrl;
+    /* v8 ignore next */
+    if (!refreshUrl) throw new Error("Internal: callRefresh called without refreshUrl");
 
-    const res = await fetch(refreshUrl!, {
+    const res = await fetchWithTimeout(refreshUrl, {
       method: "GET",
       headers: { Authorization: `Bearer ${this.token}` },
     });
@@ -199,6 +202,23 @@ function extractToken(data: unknown, path: string): string {
     throw new Error(`Token not found at path '${path}' in response`);
   }
   return value;
+}
+
+/** Default timeout for auth fetch requests (30 seconds) */
+const FETCH_TIMEOUT_MS = 30_000;
+
+/**
+ * Wrapper around fetch with a 30-second timeout via AbortController.
+ * Throws an AbortError if the request takes longer than FETCH_TIMEOUT_MS.
+ */
+async function fetchWithTimeout(url: string, init: RequestInit): Promise<Response> {
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
+  try {
+    return await fetch(url, { ...init, signal: controller.signal });
+  } finally {
+    clearTimeout(timeoutId);
+  }
 }
 
 /**

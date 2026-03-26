@@ -150,7 +150,7 @@ describe("JwtAuthManager", () => {
     expect(mockFetch).toHaveBeenCalledOnce();
   });
 
-  it("throws and logs error on login failure (Error instance)", async () => {
+  it("throws on login failure with HTTP error", async () => {
     mockFetch.mockResolvedValueOnce({
       ok: false,
       status: 401,
@@ -160,6 +160,13 @@ describe("JwtAuthManager", () => {
 
     const manager = new JwtAuthManager(BASE_CONFIG);
     await expect(manager.getHeaders()).rejects.toThrow("HTTP 401 Unauthorized");
+  });
+
+  it("throws on login timeout (AbortError)", async () => {
+    mockFetch.mockRejectedValueOnce(Object.assign(new Error("The operation was aborted"), { name: "AbortError" }));
+
+    const manager = new JwtAuthManager(BASE_CONFIG);
+    await expect(manager.getHeaders()).rejects.toThrow("aborted");
   });
 
   it("logs non-Error rejection as string during login", async () => {

@@ -142,7 +142,7 @@ JWT password auth env vars:
           const headers = { ...staticAuthHeaders, ...jwtHeaders };
           const result = await executeToolCall(tool, { ...args, ...bindings }, baseUrl, headers);
           // On 401, force-refresh JWT and retry once
-          if (result.isError && result.content.startsWith("HTTP 401") && jwtAuth) {
+          if (result.isError && result.httpStatus === 401 && jwtAuth) {
             const freshHeaders = await jwtAuth.getHeaders(true);
             return executeToolCall(tool, { ...args, ...bindings }, baseUrl, { ...staticAuthHeaders, ...freshHeaders });
           }
