@@ -30,6 +30,7 @@ Environment variables:
   API2MCP_EXCLUDE       Blacklist operations, comma-separated (same as --exclude)
   API2MCP_API_KEY       API key (uses securitySchemes from spec to determine header)
   API2MCP_BEARER_TOKEN  Bearer token (adds Authorization: Bearer header)
+  API2MCP_OVERRIDE_<toolName>  Override description for a specific tool (e.g. API2MCP_OVERRIDE_getFoo="Custom description")
 
   Legacy aliases: OPENAPI_SPEC_URL, OPENAPI_API_KEY, OPENAPI_BEARER_TOKEN
 
@@ -101,7 +102,7 @@ Examples:
       const overrides = { ...(configFile?.overrides ?? {}), ...envOverrides };
       const finalTools = applyOverrides(tools, overrides);
 
-      if (tools.length === 0) {
+      if (finalTools.length === 0) {
         const applied = [
           readonly && "readonly",
           mergedOpts.only && `only=${mergedOpts.only}`,

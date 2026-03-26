@@ -63,7 +63,6 @@ describe("applyOverrides", () => {
   it("ignores overrides for tool names that do not exist", () => {
     const tools = [makeTool("getFoo", "original")];
     expect(() => applyOverrides(tools, { nonExistent: "desc" })).not.toThrow();
-    expect(result => result).toBeDefined();
     const result = applyOverrides(tools, { nonExistent: "desc" });
     expect(result[0].description).toBe("original");
   });
