@@ -8,24 +8,24 @@ import { startMcpServer } from "../mcp-server.js";
 import { resolveFilterOptions } from "./filter-options.js";
 import { parseBindings } from "./bind-options.js";
 import { loadConfigFile, mergeEnvWithConfig } from "../config-file.js";
+import { SPEC_OPTION, resolveOption, registerOptions, findSharedOption } from "../options-schema.js";
 
 const collect = (val: string, acc: string[]) => [...acc, val];
 
 /** Register the `rest` subcommand onto the given commander program. */
 export function registerRestCommand(program: Command): void {
-  program
+  const cmd = program
     .command("rest")
     .description("Start an MCP server from an OpenAPI spec")
     .argument("[spec]", "OpenAPI spec URL or file path")
     .option("-H, --header <header>", "Add a request header (repeatable)", collect, [])
-    .option("--readonly", "Expose only read-only operations (GET/HEAD)")
-    .option("--only <operations>", "Whitelist operations by name, comma-separated")
-    .option("--exclude <operations>", "Blacklist operations by name, comma-separated")
     .option("--bind <binding>", "Pre-bind a parameter to a fixed value: key=value (repeatable)", collect, [])
-    .option("--config <path>", "Path to config file (default: auto-discover api-to-mcp.yml/yaml/json)")
     .addHelpText("after", `
 Environment variables:
   API2MCP_SPEC_URL      OpenAPI spec URL or path (alternative to positional arg)
+  API2MCP_READONLY      Expose only read operations (same as --readonly)
+  API2MCP_ONLY          Whitelist operations, comma-separated (same as --only)
+  API2MCP_EXCLUDE       Blacklist operations, comma-separated (same as --exclude)
   API2MCP_API_KEY       API key (uses securitySchemes from spec to determine header)
   API2MCP_BEARER_TOKEN  Bearer token (adds Authorization: Bearer header)
 
@@ -38,17 +38,20 @@ Examples:
   $ api-to-mcp rest spec.yaml --only "getIssue,listIssues"
   $ api-to-mcp rest spec.yaml --exclude "deleteIssue,archiveProject"
   $ api-to-mcp rest spec.yaml --bind "teamId=TEAM_ABC" --bind "projectId=PROJ_XYZ"
-  $ API2MCP_SPEC_URL=https://api.example.com/openapi.yaml api-to-mcp rest`)
-    .action(async (specArg: string | undefined, opts: { header: string[]; readonly?: boolean; only?: string; exclude?: string; bind: string[]; config?: string }) => {
+  $ API2MCP_SPEC_URL=https://api.example.com/openapi.yaml api-to-mcp rest`);
+
+  registerOptions(cmd, SHARED_OPTIONS);
+
+  cmd.action(async (specArg: string | undefined, opts: { header: string[]; readonly?: boolean; only?: string; exclude?: string; bind: string[]; config?: string }) => {
       const configFile = loadConfigFile(opts.config);
-      const specSource = specArg || process.env.API2MCP_SPEC_URL || process.env.OPENAPI_SPEC_URL || configFile?.spec;
+      const specSource = resolveOption(SPEC_OPTION, specArg, process.env, configFile);
 
       if (!specSource) {
         process.stderr.write(chalk.red("Error: no spec source provided. Pass as argument or set API2MCP_SPEC_URL.\n"));
         process.exit(1);
       }
 
-      const readonly = opts.readonly ?? configFile?.options?.readonly ?? false;
+      const readonly = resolveOption(findSharedOption("readonly"), opts.readonly, process.env, configFile) ?? false;
       const bindings = { ...(configFile?.options?.bind ?? {}), ...parseBindings(opts.bind) };
 
       const spec = await loadSpec(specSource);
@@ -67,8 +70,8 @@ Examples:
 
       const bound = applyBindings(allTools, bindings);
       const mergedOpts = {
-        only: opts.only ?? configFile?.options?.only?.join(","),
-        exclude: opts.exclude ?? configFile?.options?.exclude?.join(","),
+        only: resolveOption(findSharedOption("only"), opts.only, process.env, configFile),
+        exclude: resolveOption(findSharedOption("exclude"), opts.exclude, process.env, configFile),
       };
       const { only, exclude } = resolveFilterOptions(mergedOpts, bound);
       const tools = filterTools(bound, { readonly, only, exclude });
@@ -76,8 +79,8 @@ Examples:
       if (tools.length === 0) {
         const applied = [
           readonly && "readonly",
-          opts.only && `only=${opts.only}`,
-          opts.exclude && `exclude=${opts.exclude}`,
+          mergedOpts.only && `only=${mergedOpts.only}`,
+          mergedOpts.exclude && `exclude=${mergedOpts.exclude}`,
           Object.keys(bindings).length > 0 && `bind=[${Object.keys(bindings).join(", ")}]`,
         ].filter(Boolean).join(", ");
         process.stderr.write(chalk.red(

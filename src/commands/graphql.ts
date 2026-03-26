@@ -10,24 +10,24 @@ import { startMcpServer } from "../mcp-server.js";
 import { resolveFilterOptions } from "./filter-options.js";
 import { parseBindings } from "./bind-options.js";
 import { loadConfigFile, mergeEnvWithConfig } from "../config-file.js";
+import { SPEC_OPTION, resolveOption, registerOptions, findSharedOption } from "../options-schema.js";
 
 const collect = (val: string, acc: string[]) => [...acc, val];
 
 /** Register the `graphql` subcommand onto the given commander program. */
 export function registerGraphqlCommand(program: Command): void {
-  program
+  const cmd = program
     .command("graphql")
     .description("Start an MCP server from a GraphQL schema")
     .argument("[endpoint]", "GraphQL endpoint URL or SDL file path")
     .option("-H, --header <header>", "Add a request header (repeatable)", collect, [])
-    .option("--readonly", "Expose only Query operations (no Mutations)")
-    .option("--only <operations>", "Whitelist operations by name, comma-separated")
-    .option("--exclude <operations>", "Blacklist operations by name, comma-separated")
     .option("--bind <binding>", "Pre-bind a parameter to a fixed value: key=value (repeatable)", collect, [])
-    .option("--config <path>", "Path to config file (default: auto-discover api-to-mcp.yml/yaml/json)")
     .addHelpText("after", `
 Environment variables:
   API2MCP_SPEC_URL      GraphQL endpoint URL (alternative to positional arg)
+  API2MCP_READONLY      Expose only read operations (same as --readonly)
+  API2MCP_ONLY          Whitelist operations, comma-separated (same as --only)
+  API2MCP_EXCLUDE       Blacklist operations, comma-separated (same as --exclude)
   API2MCP_BEARER_TOKEN  Bearer token (adds Authorization: Bearer header)
   API2MCP_API_KEY       API key (adds X-API-Key header)
 
@@ -36,21 +36,20 @@ Examples:
   $ api-to-mcp graphql ./schema.graphql
   $ api-to-mcp graphql https://api.linear.app/graphql --readonly
   $ api-to-mcp graphql https://api.example.com/graphql --only "query_issues,query_viewer"
-  $ api-to-mcp graphql https://api.example.com/graphql --bind "teamId=TEAM_ABC"`)
-    .action(async (endpointArg: string, opts: {
-      header: string[];
-      readonly?: boolean;
-      only?: string;
-      exclude?: string;
-      bind: string[];
-      config?: string;
-    }) => {
+  $ api-to-mcp graphql https://api.example.com/graphql --bind "teamId=TEAM_ABC"`);
+
+  registerOptions(cmd, SHARED_OPTIONS);
+
+  cmd.action(async (endpointArg: string, opts: {
+    header: string[];
+    readonly?: boolean;
+    only?: string;
+    exclude?: string;
+    bind: string[];
+    config?: string;
+  }) => {
       const configFile = loadConfigFile(opts.config);
-      const endpoint =
-        endpointArg ||
-        process.env.API2MCP_SPEC_URL ||
-        process.env.OPENAPI_SPEC_URL ||
-        configFile?.spec;
+      const endpoint = resolveOption(SPEC_OPTION, endpointArg, process.env, configFile);
 
       if (!endpoint) {
         process.stderr.write(
@@ -61,7 +60,7 @@ Examples:
         process.exit(1);
       }
 
-      const readonly = opts.readonly ?? configFile?.options?.readonly ?? false;
+      const readonly = resolveOption(findSharedOption("readonly"), opts.readonly, process.env, configFile) ?? false;
       const bindings = { ...(configFile?.options?.bind ?? {}), ...parseBindings(opts.bind) };
 
       // Build auth headers: config.auth.headers (lowest) < env vars < CLI flags (highest)
@@ -93,8 +92,8 @@ Examples:
 
       const bound = applyBindings(allTools, bindings);
       const mergedOpts = {
-        only: opts.only ?? configFile?.options?.only?.join(","),
-        exclude: opts.exclude ?? configFile?.options?.exclude?.join(","),
+        only: resolveOption(findSharedOption("only"), opts.only, process.env, configFile),
+        exclude: resolveOption(findSharedOption("exclude"), opts.exclude, process.env, configFile),
       };
       const { only, exclude } = resolveFilterOptions(mergedOpts, bound);
       // readonly is already applied in buildGraphQLTools - pass false here
@@ -103,8 +102,8 @@ Examples:
       if (tools.length === 0) {
         const applied = [
           readonly && "readonly",
-          opts.only && `only=${opts.only}`,
-          opts.exclude && `exclude=${opts.exclude}`,
+          mergedOpts.only && `only=${mergedOpts.only}`,
+          mergedOpts.exclude && `exclude=${mergedOpts.exclude}`,
           Object.keys(bindings).length > 0 &&
             `bind=[${Object.keys(bindings).join(", ")}]`,
         ]
