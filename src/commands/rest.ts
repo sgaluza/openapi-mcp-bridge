@@ -9,7 +9,7 @@ import { resolveFilterOptions } from "./filter-options.js";
 import { parseBindings } from "./bind-options.js";
 import { loadConfigFile, mergeEnvWithConfig } from "../config-file.js";
 import { SPEC_OPTION, SHARED_OPTIONS, AUTH_OPTIONS, resolveOption, registerOptions, findSharedOption } from "../options-schema.js";
-import { buildJwtAuth } from "./jwt-auth-options.js";
+import { buildJwtAuth, executeWithJwtRetry, JWT_AUTH_HELP } from "./jwt-auth-options.js";
 
 const collect = (val: string, acc: string[]) => [...acc, val];
 
@@ -42,17 +42,7 @@ Examples:
   $ API2MCP_SPEC_URL=https://api.example.com/openapi.yaml api-to-mcp rest
   $ api-to-mcp rest spec.yaml --auth-type jwt-password \\
       --auth-login-url https://api.example.com/auth/login \\
-      --auth-username-field userName --auth-token-path jwt
-
-JWT password auth env vars:
-  API2MCP_AUTH_TYPE            Auth type: jwt-password
-  API2MCP_AUTH_LOGIN_URL       Login endpoint URL
-  API2MCP_AUTH_USERNAME_FIELD  Request body field for username (default: username)
-  API2MCP_AUTH_PASSWORD_FIELD  Request body field for password (default: password)
-  API2MCP_AUTH_TOKEN_PATH      Dot-path to JWT in login response (default: token)
-  API2MCP_AUTH_REFRESH_URL     Refresh endpoint (optional — default: re-login on expiry)
-  API2MCP_USERNAME             Username for jwt-password auth
-  API2MCP_PASSWORD             Password for jwt-password auth`);
+      --auth-username-field userName --auth-token-path jwt${JWT_AUTH_HELP}`);
 
   registerOptions(cmd, SHARED_OPTIONS);
   registerOptions(cmd, AUTH_OPTIONS);
@@ -137,17 +127,12 @@ JWT password auth env vars:
         specSource,
         baseUrl,
         readonly,
-        executeCall: async (tool, args) => {
-          const jwtHeaders = jwtAuth ? await jwtAuth.getHeaders() : {};
-          const headers = { ...staticAuthHeaders, ...jwtHeaders };
-          const result = await executeToolCall(tool, { ...args, ...bindings }, baseUrl, headers);
-          // On 401, force-refresh JWT and retry once
-          if (result.isError && result.httpStatus === 401 && jwtAuth) {
-            const freshHeaders = await jwtAuth.getHeaders(true);
-            return executeToolCall(tool, { ...args, ...bindings }, baseUrl, { ...staticAuthHeaders, ...freshHeaders });
-          }
-          return result;
-        },
+        executeCall: (tool, args) =>
+          executeWithJwtRetry(
+            (headers) => executeToolCall(tool, { ...args, ...bindings }, baseUrl, headers),
+            jwtAuth,
+            staticAuthHeaders
+          ),
       });
     });
 }
