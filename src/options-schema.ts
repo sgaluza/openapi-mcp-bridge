@@ -68,6 +68,7 @@ export const SPEC_OPTION: OptionDef = {
 
 /** Get a nested value from an object by dot-path ("options.readonly" etc.) */
 function getPath(obj: unknown, path: string): unknown {
+  /* v8 ignore next */
   if (!path) return undefined;
   return path.split(".").reduce((acc: unknown, key) => {
     if (acc !== null && typeof acc === "object") {

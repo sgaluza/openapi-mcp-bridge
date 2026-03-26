@@ -259,3 +259,31 @@ describe("findSharedOption", () => {
   });
 });
 
+describe("resolveOption — edge cases", () => {
+  it("returns undefined when env is empty string (falsy non-array, no env lookup)", () => {
+    const def: OptionDef = {
+      key: "test",
+      env: "",
+      config: "spec",
+      description: "",
+      type: "string",
+    };
+    const result = resolveOption(def, undefined, { "": "ignored" }, null);
+    expect(result).toBeUndefined();
+  });
+
+  it("returns undefined when config path traverses through non-object intermediate", () => {
+    const def: OptionDef = {
+      key: "test",
+      env: "TEST_ENV",
+      config: "options.readonly",
+      description: "",
+      type: "boolean",
+    };
+    // options is a string, not an object — path traversal hits non-object intermediate
+    const config = { options: "not-an-object" } as unknown as ConfigFile;
+    const result = resolveOption(def, undefined, {}, config);
+    expect(result).toBeUndefined();
+  });
+});
+
