@@ -98,7 +98,7 @@ export const AUTH_OPTIONS: OptionDef[] = [
     cli: "--auth-token-path <path>",
     env: "API2MCP_AUTH_TOKEN_PATH",
     config: "auth.tokenPath",
-    description: "Dot-path to JWT in login response (default: token)",
+    description: "Path to JWT in login response: simple name (token), dot-path (data.jwt), or JSONPath ($.token) (default: token)",
     type: "string",
     default: "token",
   },

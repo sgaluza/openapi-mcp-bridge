@@ -189,6 +189,42 @@ describe("buildJwtAuth", () => {
     expect(result).toBeInstanceOf(JwtAuthManager);
   });
 
+  it("exits with error when loginUrl is not a valid URL", () => {
+    const stderrSpy = vi.spyOn(process.stderr, "write").mockImplementation(() => true);
+    const exitSpy = vi.spyOn(process, "exit").mockImplementation(() => { throw new Error("exit"); });
+
+    expect(() =>
+      buildJwtAuth({ authType: "jwt-password", authLoginUrl: "not-a-url" }, null, BASE_ENV)
+    ).toThrow("exit");
+
+    const output = stderrSpy.mock.calls.flat().join("");
+    expect(output).toContain("auth-login-url");
+    expect(output).toContain("not-a-url");
+    expect(exitSpy).toHaveBeenCalledWith(1);
+    stderrSpy.mockRestore();
+    exitSpy.mockRestore();
+  });
+
+  it("exits with error when refreshUrl is not a valid URL", () => {
+    const stderrSpy = vi.spyOn(process.stderr, "write").mockImplementation(() => true);
+    const exitSpy = vi.spyOn(process, "exit").mockImplementation(() => { throw new Error("exit"); });
+
+    expect(() =>
+      buildJwtAuth(
+        { authType: "jwt-password", authLoginUrl: "https://api.example.com/login", authRefreshUrl: "bad-refresh" },
+        null,
+        BASE_ENV
+      )
+    ).toThrow("exit");
+
+    const output = stderrSpy.mock.calls.flat().join("");
+    expect(output).toContain("auth-refresh-url");
+    expect(output).toContain("bad-refresh");
+    expect(exitSpy).toHaveBeenCalledWith(1);
+    stderrSpy.mockRestore();
+    exitSpy.mockRestore();
+  });
+
   it("throws when AUTH_OPTIONS does not contain the requested key (internal guard)", () => {
     // This is an internal guard — can't be triggered via normal usage,
     // but we verify the guard exists via the known-good path

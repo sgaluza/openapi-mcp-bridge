@@ -82,6 +82,18 @@ export function buildJwtAuth(
     );
     process.exit(1);
   }
+  try { new URL(loginUrl); } catch {
+    process.stderr.write(chalk.red(`Error: --auth-login-url must be a valid URL, got: ${loginUrl}\n`));
+    process.exit(1);
+  }
+
+  const refreshUrl = resolve("authRefreshUrl", opts.authRefreshUrl);
+  if (refreshUrl) {
+    try { new URL(refreshUrl); } catch {
+      process.stderr.write(chalk.red(`Error: --auth-refresh-url must be a valid URL, got: ${refreshUrl}\n`));
+      process.exit(1);
+    }
+  }
 
   const username = env.API2MCP_USERNAME;
   const password = env.API2MCP_PASSWORD;
@@ -99,7 +111,7 @@ export function buildJwtAuth(
     usernameField: resolve("authUsernameField", opts.authUsernameField) as string,
     passwordField: resolve("authPasswordField", opts.authPasswordField) as string,
     tokenPath: resolve("authTokenPath", opts.authTokenPath) as string,
-    refreshUrl: resolve("authRefreshUrl", opts.authRefreshUrl),
+    refreshUrl,
     username,
     password,
   });
