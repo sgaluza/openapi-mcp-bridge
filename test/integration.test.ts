@@ -1320,6 +1320,31 @@ describe("loadSpec — local file", () => {
     }
   });
 
+  it("ignores headers when loading local file", async () => {
+    const { writeFile, unlink } = await import("node:fs/promises");
+    const { tmpdir } = await import("node:os");
+    const { join } = await import("node:path");
+
+    const spec = {
+      openapi: "3.0.0",
+      info: { title: "Local With Headers", version: "1.0.0" },
+      paths: { "/x": { get: { operationId: "x" } } },
+    };
+    const filePath = join(tmpdir(), `test-spec-headers-${Date.now()}.json`);
+    await writeFile(filePath, JSON.stringify(spec), "utf-8");
+
+    vi.stubGlobal("fetch", vi.fn());
+
+    try {
+      const loaded = await loadSpec(filePath, { Authorization: "Bearer token" });
+      expect(loaded.info.title).toBe("Local With Headers");
+      expect(fetch).not.toHaveBeenCalled();
+    } finally {
+      await unlink(filePath);
+      vi.unstubAllGlobals();
+    }
+  });
+
   it("throws for spec missing openapi field", async () => {
     vi.stubGlobal("fetch", vi.fn());
     vi.mocked(fetch).mockResolvedValue({
