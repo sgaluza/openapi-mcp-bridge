@@ -76,7 +76,21 @@ Examples:
       const readonly = resolveOption(findSharedOption("readonly"), opts.readonly, process.env, configFile) ?? false;
       const bindings = { ...(configFile?.options?.bind ?? {}), ...parseBindings(opts.bind) };
 
-      const spec = await loadSpec(specSource);
+      // Build auth headers before loading spec so protected specs can be fetched.
+      // Pass null for spec — securitySchemes aren't available yet (same as GraphQL flow).
+      const mergedEnv = mergeEnvWithConfig(process.env, configFile?.auth);
+      const cliHeaders = parseHeaderFlags(opts.header);
+      const preAuthHeaders = {
+        ...(configFile?.auth?.headers ?? {}),
+        ...resolveAuthHeaders(null, { cliHeaders, env: mergedEnv }),
+      };
+
+      const jwtAuth = buildJwtAuth(opts, configFile, process.env);
+      const specHeaders = jwtAuth
+        ? { ...preAuthHeaders, ...(await jwtAuth.getHeaders()) }
+        : preAuthHeaders;
+
+      const spec = await loadSpec(specSource, specHeaders);
       const serverName = spec.info.title || "api-to-mcp";
       const serverVersion = spec.info.version || "0.1.0";
 
@@ -119,16 +133,11 @@ Examples:
       const baseUrl =
         resolveOption(BASE_URL_OPTION, opts.baseUrl, process.env, configFile) ??
         resolveBaseUrl(spec.servers?.[0]?.url, specSource);
-      const mergedEnv = mergeEnvWithConfig(process.env, configFile?.auth);
+      // Rebuild auth headers with spec available — securitySchemes now resolved for API key placement
       const staticAuthHeaders = {
         ...(configFile?.auth?.headers ?? {}),
-        ...resolveAuthHeaders(spec, {
-          cliHeaders: parseHeaderFlags(opts.header),
-          env: mergedEnv,
-        }),
+        ...resolveAuthHeaders(spec, { cliHeaders, env: mergedEnv }),
       };
-
-      const jwtAuth = buildJwtAuth(opts, configFile, process.env);
 
       await startMcpServer({
         serverName,

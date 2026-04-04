@@ -1235,6 +1235,53 @@ describe("loadSpec — HTTP errors and unknown format", () => {
     );
   });
 
+  it("passes headers to fetch when provided", async () => {
+    const spec = { openapi: "3.0.0", info: { title: "T", version: "1" }, paths: { "/x": { get: { operationId: "x" } } } };
+    vi.stubGlobal("fetch", vi.fn());
+    vi.mocked(fetch).mockResolvedValue({
+      ok: true,
+      text: async () => JSON.stringify(spec),
+      headers: { get: () => "application/json" },
+    } as unknown as Response);
+
+    await loadSpec("https://api.example.com/openapi.json", {
+      Authorization: "Bearer test-token",
+      "X-Custom": "value",
+    });
+
+    expect(fetch).toHaveBeenCalledWith("https://api.example.com/openapi.json", {
+      headers: { Authorization: "Bearer test-token", "X-Custom": "value" },
+    });
+  });
+
+  it("does not pass init options when no headers provided", async () => {
+    const spec = { openapi: "3.0.0", info: { title: "T", version: "1" }, paths: { "/x": { get: { operationId: "x" } } } };
+    vi.stubGlobal("fetch", vi.fn());
+    vi.mocked(fetch).mockResolvedValue({
+      ok: true,
+      text: async () => JSON.stringify(spec),
+      headers: { get: () => "application/json" },
+    } as unknown as Response);
+
+    await loadSpec("https://api.example.com/openapi.json");
+
+    expect(fetch).toHaveBeenCalledWith("https://api.example.com/openapi.json", undefined);
+  });
+
+  it("does not pass init options when empty headers object provided", async () => {
+    const spec = { openapi: "3.0.0", info: { title: "T", version: "1" }, paths: { "/x": { get: { operationId: "x" } } } };
+    vi.stubGlobal("fetch", vi.fn());
+    vi.mocked(fetch).mockResolvedValue({
+      ok: true,
+      text: async () => JSON.stringify(spec),
+      headers: { get: () => "application/json" },
+    } as unknown as Response);
+
+    await loadSpec("https://api.example.com/openapi.json", {});
+
+    expect(fetch).toHaveBeenCalledWith("https://api.example.com/openapi.json", undefined);
+  });
+
   it("loads spec when content-type has no json/yaml hint (falls back to content detection)", async () => {
     const spec = { openapi: "3.0.0", info: { title: "T", version: "1" }, paths: {} };
     vi.stubGlobal("fetch", vi.fn());
@@ -1270,6 +1317,31 @@ describe("loadSpec — local file", () => {
       expect(loaded.paths["/ping"]).toBeDefined();
     } finally {
       await unlink(filePath);
+    }
+  });
+
+  it("ignores headers when loading local file", async () => {
+    const { writeFile, unlink } = await import("node:fs/promises");
+    const { tmpdir } = await import("node:os");
+    const { join } = await import("node:path");
+
+    const spec = {
+      openapi: "3.0.0",
+      info: { title: "Local With Headers", version: "1.0.0" },
+      paths: { "/x": { get: { operationId: "x" } } },
+    };
+    const filePath = join(tmpdir(), `test-spec-headers-${Date.now()}.json`);
+    await writeFile(filePath, JSON.stringify(spec), "utf-8");
+
+    vi.stubGlobal("fetch", vi.fn());
+
+    try {
+      const loaded = await loadSpec(filePath, { Authorization: "Bearer token" });
+      expect(loaded.info.title).toBe("Local With Headers");
+      expect(fetch).not.toHaveBeenCalled();
+    } finally {
+      await unlink(filePath);
+      vi.unstubAllGlobals();
     }
   });
 
