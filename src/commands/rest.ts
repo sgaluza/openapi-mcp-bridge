@@ -8,7 +8,7 @@ import { startMcpServer } from "../mcp-server.js";
 import { resolveFilterOptions } from "./filter-options.js";
 import { parseBindings } from "./bind-options.js";
 import { loadConfigFile, mergeEnvWithConfig } from "../config-file.js";
-import { SPEC_OPTION, BASE_URL_OPTION, SHARED_OPTIONS, AUTH_OPTIONS, resolveOption, registerOptions, findSharedOption } from "../options-schema.js";
+import { SPEC_OPTION, BASE_URL_OPTION, SHARED_OPTIONS, AUTH_OPTIONS, SPEC_AUTH_OPTION, resolveOption, registerOptions, findSharedOption } from "../options-schema.js";
 import { buildJwtAuth, executeWithJwtRetry, JWT_AUTH_HELP } from "./jwt-auth-options.js";
 
 const collect = (val: string, acc: string[]) => [...acc, val];
@@ -47,7 +47,7 @@ Examples:
       --auth-username-field userName --auth-token-path jwt${JWT_AUTH_HELP}`);
 
   registerOptions(cmd, SHARED_OPTIONS);
-  registerOptions(cmd, [BASE_URL_OPTION]);
+  registerOptions(cmd, [BASE_URL_OPTION, SPEC_AUTH_OPTION]);
   registerOptions(cmd, AUTH_OPTIONS);
 
   cmd.action(async (specArg: string | undefined, opts: {
@@ -58,6 +58,7 @@ Examples:
     bind: string[];
     config?: string;
     baseUrl?: string;
+    specAuth?: boolean;
     authType?: string;
     authLoginUrl?: string;
     authUsernameField?: string;
@@ -76,19 +77,22 @@ Examples:
       const readonly = resolveOption(findSharedOption("readonly"), opts.readonly, process.env, configFile) ?? false;
       const bindings = { ...(configFile?.options?.bind ?? {}), ...parseBindings(opts.bind) };
 
-      // Build auth headers before loading spec so protected specs can be fetched.
-      // Pass null for spec — securitySchemes aren't available yet (same as GraphQL flow).
       const mergedEnv = mergeEnvWithConfig(process.env, configFile?.auth);
       const cliHeaders = parseHeaderFlags(opts.header);
-      const preAuthHeaders = {
-        ...(configFile?.auth?.headers ?? {}),
-        ...resolveAuthHeaders(null, { cliHeaders, env: mergedEnv }),
-      };
-
       const jwtAuth = buildJwtAuth(opts, configFile, process.env);
-      const specHeaders = jwtAuth
-        ? { ...preAuthHeaders, ...(await jwtAuth.getHeaders()) }
-        : preAuthHeaders;
+
+      // Only send auth headers when fetching spec if --spec-auth is enabled
+      const specAuth = resolveOption(SPEC_AUTH_OPTION, opts.specAuth, process.env, configFile) ?? false;
+      let specHeaders: Record<string, string> | undefined;
+      if (specAuth) {
+        const preAuthHeaders = {
+          ...(configFile?.auth?.headers ?? {}),
+          ...resolveAuthHeaders(null, { cliHeaders, env: mergedEnv }),
+        };
+        specHeaders = jwtAuth
+          ? { ...preAuthHeaders, ...(await jwtAuth.getHeaders()) }
+          : preAuthHeaders;
+      }
 
       const spec = await loadSpec(specSource, specHeaders);
       const serverName = spec.info.title || "api-to-mcp";

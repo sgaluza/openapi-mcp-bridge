@@ -57,6 +57,17 @@ export const SHARED_OPTIONS: OptionDef[] = [
   },
 ];
 
+/** Spec auth option — send auth headers when fetching the spec/schema */
+export const SPEC_AUTH_OPTION: OptionDef = {
+  key: "specAuth",
+  cli: "--spec-auth",
+  env: "API2MCP_SPEC_AUTH",
+  config: "options.specAuth",
+  description: "Send auth headers when fetching the spec (off by default — enable for protected specs)",
+  type: "boolean",
+  default: false,
+};
+
 /** Auth options shared by both `rest` and `graphql` commands */
 export const AUTH_OPTIONS: OptionDef[] = [
   {

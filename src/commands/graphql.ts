@@ -10,7 +10,7 @@ import { startMcpServer } from "../mcp-server.js";
 import { resolveFilterOptions } from "./filter-options.js";
 import { parseBindings } from "./bind-options.js";
 import { loadConfigFile, mergeEnvWithConfig } from "../config-file.js";
-import { SPEC_OPTION, BASE_URL_OPTION, SHARED_OPTIONS, AUTH_OPTIONS, resolveOption, registerOptions, findSharedOption } from "../options-schema.js";
+import { SPEC_OPTION, BASE_URL_OPTION, SHARED_OPTIONS, AUTH_OPTIONS, SPEC_AUTH_OPTION, resolveOption, registerOptions, findSharedOption } from "../options-schema.js";
 import { buildJwtAuth, executeWithJwtRetry, JWT_AUTH_HELP } from "./jwt-auth-options.js";
 
 const collect = (val: string, acc: string[]) => [...acc, val];
@@ -43,7 +43,7 @@ Examples:
       --auth-login-url https://api.example.com/auth/login --auth-token-path jwt${JWT_AUTH_HELP}`);
 
   registerOptions(cmd, SHARED_OPTIONS);
-  registerOptions(cmd, [BASE_URL_OPTION]);
+  registerOptions(cmd, [BASE_URL_OPTION, SPEC_AUTH_OPTION]);
   registerOptions(cmd, AUTH_OPTIONS);
 
   cmd.action(async (endpointArg: string, opts: {
@@ -54,6 +54,7 @@ Examples:
     bind: string[];
     config?: string;
     baseUrl?: string;
+    specAuth?: boolean;
     authType?: string;
     authLoginUrl?: string;
     authUsernameField?: string;
@@ -79,20 +80,22 @@ Examples:
 
       // Build auth headers: config.auth.headers (lowest) < env vars < CLI flags (highest)
       const mergedEnv = mergeEnvWithConfig(process.env, configFile?.auth);
+      const cliHeaders = parseHeaderFlags(opts.header);
       const staticAuthHeaders = {
         ...(configFile?.auth?.headers ?? {}),
-        ...resolveAuthHeaders(null, {
-          cliHeaders: parseHeaderFlags(opts.header),
-          env: mergedEnv,
-        }),
+        ...resolveAuthHeaders(null, { cliHeaders, env: mergedEnv }),
       };
 
       const jwtAuth = buildJwtAuth(opts, configFile, process.env);
 
-      // For schema loading, get initial JWT headers if jwt-password auth is configured
-      const schemaHeaders = jwtAuth
-        ? { ...staticAuthHeaders, ...(await jwtAuth.getHeaders()) }
-        : staticAuthHeaders;
+      // Only send auth headers when fetching schema if --spec-auth is enabled
+      const specAuth = resolveOption(SPEC_AUTH_OPTION, opts.specAuth, process.env, configFile) ?? false;
+      let schemaHeaders: Record<string, string> | undefined;
+      if (specAuth) {
+        schemaHeaders = jwtAuth
+          ? { ...staticAuthHeaders, ...(await jwtAuth.getHeaders()) }
+          : staticAuthHeaders;
+      }
 
       const schema = await loadGraphQLSchema(endpoint, schemaHeaders);
       const allTools = buildGraphQLTools(schema, { readonly });
