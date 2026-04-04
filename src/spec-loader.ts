@@ -177,7 +177,7 @@ export async function loadSpec(
 
   if (source.startsWith("http://") || source.startsWith("https://")) {
     const init = headers && Object.keys(headers).length > 0 ? { headers } : undefined;
-    const response = await fetch(source, ...init ? [init] : []);
+    const response = await fetch(source, init);
     if (!response.ok) {
       throw new Error(
         `Failed to fetch spec from ${source}: ${response.status} ${response.statusText}`

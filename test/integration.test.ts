@@ -1265,7 +1265,21 @@ describe("loadSpec — HTTP errors and unknown format", () => {
 
     await loadSpec("https://api.example.com/openapi.json");
 
-    expect(fetch).toHaveBeenCalledWith("https://api.example.com/openapi.json");
+    expect(fetch).toHaveBeenCalledWith("https://api.example.com/openapi.json", undefined);
+  });
+
+  it("does not pass init options when empty headers object provided", async () => {
+    const spec = { openapi: "3.0.0", info: { title: "T", version: "1" }, paths: { "/x": { get: { operationId: "x" } } } };
+    vi.stubGlobal("fetch", vi.fn());
+    vi.mocked(fetch).mockResolvedValue({
+      ok: true,
+      text: async () => JSON.stringify(spec),
+      headers: { get: () => "application/json" },
+    } as unknown as Response);
+
+    await loadSpec("https://api.example.com/openapi.json", {});
+
+    expect(fetch).toHaveBeenCalledWith("https://api.example.com/openapi.json", undefined);
   });
 
   it("loads spec when content-type has no json/yaml hint (falls back to content detection)", async () => {
