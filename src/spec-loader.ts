@@ -167,6 +167,8 @@ function formatHint(
 /**
  * Load an OpenAPI spec from a URL or local file path.
  * Supports both JSON and YAML formats.
+ * @param source - URL (http/https) or local file path to the OpenAPI spec
+ * @param headers - Optional HTTP headers to include when fetching spec from URL (ignored for local files)
  */
 export async function loadSpec(
   source: string,
