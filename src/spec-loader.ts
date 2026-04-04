@@ -168,12 +168,16 @@ function formatHint(
  * Load an OpenAPI spec from a URL or local file path.
  * Supports both JSON and YAML formats.
  */
-export async function loadSpec(source: string): Promise<OpenAPISpec> {
+export async function loadSpec(
+  source: string,
+  headers?: Record<string, string>
+): Promise<OpenAPISpec> {
   let text: string;
   let hint: string | undefined;
 
   if (source.startsWith("http://") || source.startsWith("https://")) {
-    const response = await fetch(source);
+    const init = headers && Object.keys(headers).length > 0 ? { headers } : undefined;
+    const response = await fetch(source, ...init ? [init] : []);
     if (!response.ok) {
       throw new Error(
         `Failed to fetch spec from ${source}: ${response.status} ${response.statusText}`

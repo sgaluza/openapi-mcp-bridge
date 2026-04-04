@@ -1235,6 +1235,39 @@ describe("loadSpec — HTTP errors and unknown format", () => {
     );
   });
 
+  it("passes headers to fetch when provided", async () => {
+    const spec = { openapi: "3.0.0", info: { title: "T", version: "1" }, paths: { "/x": { get: { operationId: "x" } } } };
+    vi.stubGlobal("fetch", vi.fn());
+    vi.mocked(fetch).mockResolvedValue({
+      ok: true,
+      text: async () => JSON.stringify(spec),
+      headers: { get: () => "application/json" },
+    } as unknown as Response);
+
+    await loadSpec("https://api.example.com/openapi.json", {
+      Authorization: "Bearer test-token",
+      "X-Custom": "value",
+    });
+
+    expect(fetch).toHaveBeenCalledWith("https://api.example.com/openapi.json", {
+      headers: { Authorization: "Bearer test-token", "X-Custom": "value" },
+    });
+  });
+
+  it("does not pass init options when no headers provided", async () => {
+    const spec = { openapi: "3.0.0", info: { title: "T", version: "1" }, paths: { "/x": { get: { operationId: "x" } } } };
+    vi.stubGlobal("fetch", vi.fn());
+    vi.mocked(fetch).mockResolvedValue({
+      ok: true,
+      text: async () => JSON.stringify(spec),
+      headers: { get: () => "application/json" },
+    } as unknown as Response);
+
+    await loadSpec("https://api.example.com/openapi.json");
+
+    expect(fetch).toHaveBeenCalledWith("https://api.example.com/openapi.json");
+  });
+
   it("loads spec when content-type has no json/yaml hint (falls back to content detection)", async () => {
     const spec = { openapi: "3.0.0", info: { title: "T", version: "1" }, paths: {} };
     vi.stubGlobal("fetch", vi.fn());
